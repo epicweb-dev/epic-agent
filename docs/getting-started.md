@@ -72,6 +72,8 @@ bun ./docs/post-download.ts --guided
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
+- `APP_BASE_URL` (production app URL)
+- `APP_BASE_URL_PREVIEW` (optional preview URL for PR preview deploys)
 
 3. Deploy:
 

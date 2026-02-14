@@ -64,6 +64,9 @@ Configure these secrets for deploy workflows:
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
 - `COOKIE_SECRET` (same format as local)
+- `APP_BASE_URL` (production base URL)
+- `APP_BASE_URL_PREVIEW` (optional preview base URL; falls back to
+  `APP_BASE_URL` when omitted)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
 - `GITHUB_TOKEN` (optional, recommended for indexing throughput)
