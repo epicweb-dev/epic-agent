@@ -38,6 +38,14 @@ export const retrieveDiffContextInputSchema = {
 	...commonRetrievalSchema,
 }
 
+export const searchTopicContextInputSchema = {
+	query: z.string().trim().min(3),
+	limit: z.coerce.number().int().positive().max(20).optional(),
+	workshop: z.string().trim().min(1).optional(),
+	exerciseNumber: z.coerce.number().int().positive().optional(),
+	stepNumber: z.coerce.number().int().positive().optional(),
+}
+
 export type RetrieveLearningContextInput = z.infer<
 	typeof retrieveLearningContextInputSchema
 >

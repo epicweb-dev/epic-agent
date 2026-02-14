@@ -2,12 +2,14 @@ import { z } from 'zod'
 import { type MCP } from './index.ts'
 import {
 	listWorkshopsInputSchema,
+	searchTopicContextInputSchema,
 	retrieveDiffContextInputSchema,
 	retrieveLearningContextInputSchema,
 } from './workshop-contracts.ts'
 import {
 	retrieveDiffContext,
 	retrieveLearningContext,
+	searchTopicContext,
 	retrieveWorkshopList,
 } from './workshop-retrieval.ts'
 
@@ -164,6 +166,38 @@ export async function registerTools(agent: MCP) {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error)
 				return buildErrorResult(`Unable to retrieve diff context: ${message}`)
+			}
+		},
+	)
+
+	agent.server.registerTool(
+		'search_topic_context',
+		{
+			description:
+				'Search vectorized workshop chunks to find where topics are taught',
+			inputSchema: searchTopicContextInputSchema,
+		},
+		async (rawArgs: unknown) => {
+			const args = z.object(searchTopicContextInputSchema).safeParse(rawArgs)
+			if (!args.success) {
+				return buildErrorResult(`Invalid input: ${args.error.message}`)
+			}
+			try {
+				const result = await searchTopicContext({
+					env: agent.requireEnv(),
+					query: args.data.query,
+					limit: args.data.limit,
+					workshop: args.data.workshop,
+					exerciseNumber: args.data.exerciseNumber,
+					stepNumber: args.data.stepNumber,
+				})
+				return {
+					content: [{ type: 'text', text: formatJson(result) }],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(`Unable to search topic context: ${message}`)
 			}
 		},
 	)

@@ -425,6 +425,8 @@ async function githubJson<T>({
 	const response = await fetch(url, {
 		headers: {
 			Accept: 'application/vnd.github+json',
+			'User-Agent': 'epic-agent-workshop-indexer',
+			'X-GitHub-Api-Version': '2022-11-28',
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 		},
 	})

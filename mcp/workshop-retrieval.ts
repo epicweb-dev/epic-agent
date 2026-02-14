@@ -12,6 +12,12 @@ import { type RetrieveLearningContextInput } from './workshop-contracts.ts'
 
 const defaultContextMaxChars = 50_000
 const defaultHardMaxChars = 80_000
+const defaultVectorSearchLimit = 8
+
+type VectorSearchEnv = Env & {
+	WORKSHOP_VECTOR_INDEX?: Vectorize
+	AI?: Ai
+}
 
 function resolvePayloadLimits(env: Env) {
 	const defaultMaxChars = Math.max(
@@ -337,5 +343,140 @@ export async function retrieveDiffContext({
 		diffSections: truncatedResult.sections,
 		truncated: truncatedResult.truncated,
 		nextCursor: truncatedResult.nextCursor,
+	}
+}
+
+async function embedSearchQuery({ ai, query }: { ai: Ai; query: string }) {
+	const response = (await ai.run('@cf/baai/bge-base-en-v1.5', {
+		text: [query],
+	})) as unknown
+
+	if (Array.isArray(response)) {
+		const first = response[0]
+		if (Array.isArray(first)) return first
+	}
+
+	if (
+		response &&
+		typeof response === 'object' &&
+		'data' in response &&
+		Array.isArray((response as { data?: unknown }).data)
+	) {
+		const first = (response as { data: Array<Array<number>> }).data[0]
+		if (Array.isArray(first)) return first
+	}
+
+	throw new Error('Embedding model did not return a valid vector response.')
+}
+
+export async function searchTopicContext({
+	env,
+	query,
+	limit,
+	workshop,
+	exerciseNumber,
+	stepNumber,
+}: {
+	env: Env
+	query: string
+	limit?: number
+	workshop?: string
+	exerciseNumber?: number
+	stepNumber?: number
+}) {
+	const startedAt = Date.now()
+	const vectorEnv = env as VectorSearchEnv
+	const vectorIndex = vectorEnv.WORKSHOP_VECTOR_INDEX
+	const ai = vectorEnv.AI
+	if (!vectorIndex || !ai) {
+		throw new Error(
+			'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
+		)
+	}
+
+	const topK = Math.min(Math.max(limit ?? defaultVectorSearchLimit, 1), 20)
+	const embedding = await embedSearchQuery({ ai, query })
+	const filter: Record<string, string | number> = {}
+	if (workshop) filter.workshop_slug = workshop
+	if (typeof exerciseNumber === 'number')
+		filter.exercise_number = exerciseNumber
+	if (typeof stepNumber === 'number') filter.step_number = stepNumber
+
+	const vectorMatches = await vectorIndex.query(embedding, {
+		topK,
+		returnMetadata: 'indexed',
+		filter: Object.keys(filter).length > 0 ? filter : undefined,
+	})
+
+	const results: Array<{
+		score: number
+		workshop: string
+		exerciseNumber?: number
+		stepNumber?: number
+		sectionKind?: string
+		sectionLabel?: string
+		chunk: string
+		vectorId: string
+	}> = []
+
+	for (const match of vectorMatches.matches) {
+		const vectorId = match.id
+		if (!vectorId) continue
+		const row = await env.APP_DB.prepare(
+			`
+			SELECT
+				c.content AS chunk_content,
+				c.workshop_slug,
+				c.exercise_number,
+				c.step_number,
+				s.section_kind,
+				s.label
+			FROM indexed_section_chunks c
+			LEFT JOIN indexed_sections s
+				ON s.workshop_slug = c.workshop_slug
+				AND (s.exercise_number IS c.exercise_number OR (s.exercise_number IS NULL AND c.exercise_number IS NULL))
+				AND (s.step_number IS c.step_number OR (s.step_number IS NULL AND c.step_number IS NULL))
+				AND s.section_order = c.section_order
+			WHERE c.vector_id = ?
+			LIMIT 1
+		`,
+		)
+			.bind(vectorId)
+			.first<{
+				chunk_content?: string
+				workshop_slug?: string
+				exercise_number?: number | null
+				step_number?: number | null
+				section_kind?: string | null
+				label?: string | null
+			}>()
+		if (!row?.chunk_content || !row.workshop_slug) continue
+		results.push({
+			score: match.score,
+			workshop: row.workshop_slug,
+			exerciseNumber: row.exercise_number ?? undefined,
+			stepNumber: row.step_number ?? undefined,
+			sectionKind: row.section_kind ?? undefined,
+			sectionLabel: row.label ?? undefined,
+			chunk: row.chunk_content,
+			vectorId,
+		})
+	}
+
+	console.info(
+		'mcp-search-topic-context',
+		JSON.stringify({
+			queryLength: query.length,
+			topK,
+			returned: results.length,
+			filter,
+			durationMs: Date.now() - startedAt,
+		}),
+	)
+
+	return {
+		query,
+		limit: topK,
+		matches: results,
 	}
 }

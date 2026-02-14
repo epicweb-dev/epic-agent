@@ -23,6 +23,9 @@ const projectRoot = fileURLToPath(new URL('..', import.meta.url))
 const migrationsDir = join(projectRoot, 'migrations')
 const bunBin = process.execPath
 const defaultTimeoutMs = 60_000
+const indexingTimeoutMs = 240_000
+const testWorkshopIndexAdminToken = 'test-workshop-index-token'
+const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
 
 const passwordHashPrefix = 'pbkdf2_sha256'
 const passwordSaltBytes = 16
@@ -554,25 +557,30 @@ async function stopProcess(proc: ReturnType<typeof Bun.spawn>) {
 async function startDevServer(persistDir: string) {
 	const port = await getPort({ host: '127.0.0.1' })
 	const origin = `http://127.0.0.1:${port}`
+	const devCommand: Array<string> = [
+		bunBin,
+		'x',
+		'wrangler',
+		'dev',
+		'--local',
+		'--env',
+		'test',
+		'--port',
+		String(port),
+		'--ip',
+		'127.0.0.1',
+		'--persist-to',
+		persistDir,
+		'--show-interactive-dev-session=false',
+		'--log-level',
+		'error',
+	]
+	const runtimeGitHubToken = process.env.GITHUB_TOKEN?.trim()
+	if (runtimeGitHubToken) {
+		devCommand.push('--var', `GITHUB_TOKEN:${runtimeGitHubToken}`)
+	}
 	const proc = Bun.spawn({
-		cmd: [
-			bunBin,
-			'x',
-			'wrangler',
-			'dev',
-			'--local',
-			'--env',
-			'test',
-			'--port',
-			String(port),
-			'--ip',
-			'127.0.0.1',
-			'--persist-to',
-			persistDir,
-			'--show-interactive-dev-session=false',
-			'--log-level',
-			'error',
-		],
+		cmd: devCommand,
 		cwd: projectRoot,
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -593,6 +601,15 @@ async function startDevServer(persistDir: string) {
 			await stopProcess(proc)
 		},
 	}
+}
+
+function getTextResultContent(result: CallToolResult) {
+	return (
+		result.content.find(
+			(item): item is Extract<ContentBlock, { type: 'text' }> =>
+				item.type === 'text',
+		)?.text ?? ''
+	)
 }
 
 async function authorizeWithPassword(
@@ -752,6 +769,7 @@ test(
 		expect(toolNames).toContain('list_workshops')
 		expect(toolNames).toContain('retrieve_learning_context')
 		expect(toolNames).toContain('retrieve_diff_context')
+		expect(toolNames).toContain('search_topic_context')
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -772,11 +790,7 @@ test(
 			},
 		})
 
-		const textOutput =
-			(result as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const textOutput = getTextResultContent(result as CallToolResult)
 
 		expect(textOutput).toContain('12')
 	},
@@ -797,11 +811,7 @@ test(
 			},
 		})
 
-		const textOutput =
-			(result as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const textOutput = getTextResultContent(result as CallToolResult)
 
 		expect(textOutput).toContain('"workshops"')
 	},
@@ -822,11 +832,7 @@ test(
 				limit: 5,
 			},
 		})
-		const listOutput =
-			(listResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const listOutput = getTextResultContent(listResult as CallToolResult)
 		expect(listOutput).toContain('mcp-fundamentals')
 		expect(listOutput).toContain('"exerciseCount": 1')
 
@@ -839,11 +845,9 @@ test(
 				maxChars: 35,
 			},
 		})
-		const learningOutput =
-			(learningResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const learningOutput = getTextResultContent(
+			learningResult as CallToolResult,
+		)
 		expect(learningOutput).toContain('"truncated": true')
 		expect(learningOutput).toContain('"nextCursor"')
 		const parsedLearningOutput = JSON.parse(learningOutput) as {
@@ -861,11 +865,9 @@ test(
 				cursor: parsedLearningOutput.nextCursor,
 			},
 		})
-		const continuationOutput =
-			(learningContinuation as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const continuationOutput = getTextResultContent(
+			learningContinuation as CallToolResult,
+		)
 		const parsedContinuationOutput = JSON.parse(continuationOutput) as {
 			sections: Array<{ label: string; content: string }>
 			truncated: boolean
@@ -887,11 +889,7 @@ test(
 				stepNumber: 1,
 			},
 		})
-		const diffOutput =
-			(diffResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const diffOutput = getTextResultContent(diffResult as CallToolResult)
 		expect(diffOutput).toContain('"diffSections"')
 		expect(diffOutput).toContain('diff --git a/src/index.ts b/src/index.ts')
 	},
@@ -913,11 +911,9 @@ test(
 				limit: 1,
 			},
 		})
-		const firstPageOutput =
-			(firstPageResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const firstPageOutput = getTextResultContent(
+			firstPageResult as CallToolResult,
+		)
 		const parsedFirstPage = JSON.parse(firstPageOutput) as {
 			workshops: Array<{ workshop: string }>
 			nextCursor?: string
@@ -932,11 +928,9 @@ test(
 				cursor: parsedFirstPage.nextCursor,
 			},
 		})
-		const secondPageOutput =
-			(secondPageResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const secondPageOutput = getTextResultContent(
+			secondPageResult as CallToolResult,
+		)
 		const parsedSecondPage = JSON.parse(secondPageOutput) as {
 			workshops: Array<{ workshop: string }>
 		}
@@ -951,11 +945,7 @@ test(
 				hasDiffs: false,
 			},
 		})
-		const noDiffOutput =
-			(noDiffResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const noDiffOutput = getTextResultContent(noDiffResult as CallToolResult)
 		expect(noDiffOutput).toContain('advanced-typescript')
 		expect(noDiffOutput).not.toContain('mcp-fundamentals')
 
@@ -966,11 +956,7 @@ test(
 				maxChars: 300,
 			},
 		})
-		const randomOutput =
-			(randomResult as CallToolResult).content.find(
-				(item): item is Extract<ContentBlock, { type: 'text' }> =>
-					item.type === 'text',
-			)?.text ?? ''
+		const randomOutput = getTextResultContent(randomResult as CallToolResult)
 		const parsedRandomOutput = JSON.parse(randomOutput) as {
 			workshop: string
 			exerciseNumber: number
@@ -981,6 +967,107 @@ test(
 		)
 		expect(parsedRandomOutput.exerciseNumber).toBe(1)
 		expect(parsedRandomOutput.sections.length).toBeGreaterThan(0)
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+const networkTest = runWorkshopNetworkTests ? test : test.skip
+
+networkTest(
+	'manual reindex endpoint indexes real workshop data for retrieval tools',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const reindexResponse = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ workshops: ['mcp-fundamentals'] }),
+			},
+		)
+		const reindexPayload = (await reindexResponse.json()) as {
+			ok: boolean
+			error?: string
+			workshopCount: number
+			exerciseCount: number
+			stepCount: number
+			sectionCount: number
+			sectionChunkCount: number
+		}
+		if (reindexResponse.status !== 200) {
+			throw new Error(
+				`Manual reindex failed with status ${reindexResponse.status}: ${reindexPayload.error ?? 'unknown error'}`,
+			)
+		}
+		expect(reindexPayload.ok).toBe(true)
+		expect(reindexPayload.workshopCount).toBe(1)
+		expect(reindexPayload.exerciseCount).toBeGreaterThan(0)
+		expect(reindexPayload.stepCount).toBeGreaterThan(0)
+		expect(reindexPayload.sectionCount).toBeGreaterThan(0)
+		expect(reindexPayload.sectionChunkCount).toBeGreaterThan(0)
+
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+		const listResult = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				limit: 20,
+			},
+		})
+		const listPayload = JSON.parse(
+			getTextResultContent(listResult as CallToolResult),
+		) as {
+			workshops: Array<{ workshop: string; exerciseCount: number }>
+		}
+		expect(
+			listPayload.workshops.some(
+				(workshop) =>
+					workshop.workshop === 'mcp-fundamentals' &&
+					workshop.exerciseCount > 0,
+			),
+		).toBe(true)
+
+		const randomLearningContext = await mcpClient.client.callTool({
+			name: 'retrieve_learning_context',
+			arguments: {
+				random: true,
+				maxChars: 2_000,
+			},
+		})
+		const randomPayload = JSON.parse(
+			getTextResultContent(randomLearningContext as CallToolResult),
+		) as {
+			workshop: string
+			exerciseNumber: number
+			sections: Array<{ kind: string; content: string }>
+		}
+		expect(randomPayload.workshop).toBe('mcp-fundamentals')
+		expect(randomPayload.exerciseNumber).toBeGreaterThan(0)
+		expect(randomPayload.sections.length).toBeGreaterThan(0)
+	},
+	{ timeout: indexingTimeoutMs },
+)
+
+test(
+	'search_topic_context returns clear error when vector bindings are absent',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'search_topic_context',
+			arguments: {
+				query: 'model context protocol',
+			},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain('Vector search is unavailable')
 	},
 	{ timeout: defaultTimeoutMs },
 )
