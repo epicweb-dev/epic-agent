@@ -10,7 +10,8 @@ Current schema is defined by migrations in `migrations/`:
 
 - `users`: login identity and password hash
 - `password_resets`: hashed reset tokens with expiry and foreign key to users
-- `workshop_index_runs`: manual indexing run metadata and counters
+- `workshop_index_runs`: manual indexing run metadata and counters (workshops,
+  exercises, steps, sections, section chunks)
 - `indexed_workshops`: indexed workshop manifests and coverage metadata
 - `indexed_exercises`: indexed exercise summaries per workshop
 - `indexed_steps`: indexed problem/solution step pairs

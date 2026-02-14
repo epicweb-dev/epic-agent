@@ -270,6 +270,7 @@ export async function markIndexRunComplete({
 	exerciseCount,
 	stepCount,
 	sectionCount,
+	sectionChunkCount,
 }: {
 	db: D1Database
 	runId: string
@@ -277,6 +278,7 @@ export async function markIndexRunComplete({
 	exerciseCount: number
 	stepCount: number
 	sectionCount: number
+	sectionChunkCount: number
 }) {
 	await db
 		.prepare(
@@ -288,7 +290,8 @@ export async function markIndexRunComplete({
 			workshop_count = ?,
 			exercise_count = ?,
 			step_count = ?,
-			section_count = ?
+			section_count = ?,
+			section_chunk_count = ?
 		WHERE id = ?
 	`,
 		)
@@ -298,6 +301,7 @@ export async function markIndexRunComplete({
 			exerciseCount,
 			stepCount,
 			sectionCount,
+			sectionChunkCount,
 			runId,
 		)
 		.run()

@@ -983,6 +983,7 @@ export async function runWorkshopReindex({
 			exerciseCount,
 			stepCount,
 			sectionCount,
+			sectionChunkCount,
 		})
 		console.info(
 			'workshop-reindex-complete',
