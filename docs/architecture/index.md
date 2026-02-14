@@ -10,6 +10,8 @@ This folder documents the important runtime architecture for `epic-agent`.
   MCP auth.
 - [Data Storage](./data-storage.md): what is stored in D1, KV, and Durable
   Objects.
+- [MCP Retrieval Tools](./mcp-retrieval-tools.md): tool contracts and retrieval
+  behavior for workshop context.
 
 ## Source of truth in code
 

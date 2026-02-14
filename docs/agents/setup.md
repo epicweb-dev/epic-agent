@@ -35,6 +35,9 @@ Quick notes for getting a local epic-agent environment running.
 - `bun run test:e2e:install` to install Playwright browsers.
 - `bun run test:e2e` to run Playwright specs.
 - `bun run test:mcp` to run MCP server E2E tests.
+- `RUN_WORKSHOP_NETWORK_TESTS=1 bun run test:mcp` to include network-dependent
+  manual reindex MCP E2E coverage (skipped by default to avoid flaky/rate-limit
+  failures and unnecessary cost).
 
 ## Remote Cloudflare commands with API tokens
 
