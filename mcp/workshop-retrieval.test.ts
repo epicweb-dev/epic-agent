@@ -97,7 +97,8 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 	} as unknown as Ai
 
 	const mockMatches: Array<MockQueryMatch> = [
-		{ id: 'run:workshop:10:0', score: 0.91 },
+		{ id: ' run:workshop:10:0 ', score: 0.91 },
+		{ id: 'run:workshop:10:0', score: 0.89 },
 		{ id: 'run:workshop:20:0', score: 0.75 },
 	]
 	const vectorIndex = {

@@ -487,10 +487,13 @@ export async function searchTopicContext({
 		chunk: string
 		vectorId: string
 	}> = []
+	const seenVectorIds = new Set<string>()
 
 	for (const match of vectorMatches.matches) {
-		const vectorId = match.id
+		const vectorId = match.id?.trim()
 		if (!vectorId) continue
+		if (seenVectorIds.has(vectorId)) continue
+		seenVectorIds.add(vectorId)
 		const row = chunkRowsByVectorId.get(vectorId)
 		if (!row?.chunk_content || !row.workshop_slug) continue
 		results.push({
