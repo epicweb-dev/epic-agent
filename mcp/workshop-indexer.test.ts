@@ -34,6 +34,58 @@ test('parseStepFromPath supports both dotted and plain step directories', () => 
 	})
 })
 
+test('groupStepFilesByDirectory groups only step blob entries', () => {
+	const grouped = workshopIndexerTestUtils.groupStepFilesByDirectory([
+		{
+			path: 'exercises/01.ping/01.problem.connect/README.mdx',
+			mode: '100644',
+			type: 'blob',
+			sha: 'sha-problem-readme',
+			url: 'https://example.test/blob/1',
+		},
+		{
+			path: 'exercises/01.ping/01.problem.connect/src/index.ts',
+			mode: '100644',
+			type: 'blob',
+			sha: 'sha-problem-index',
+			url: 'https://example.test/blob/2',
+		},
+		{
+			path: 'exercises/01.ping/01.solution.connect/src/index.ts',
+			mode: '100644',
+			type: 'blob',
+			sha: 'sha-solution-index',
+			url: 'https://example.test/blob/3',
+		},
+		{
+			path: 'README.md',
+			mode: '100644',
+			type: 'blob',
+			sha: 'sha-root-readme',
+			url: 'https://example.test/blob/4',
+		},
+		{
+			path: 'exercises/01.ping/01.problem.connect',
+			mode: '040000',
+			type: 'tree',
+			sha: 'sha-problem-dir',
+			url: 'https://example.test/tree/1',
+		},
+	])
+
+	expect(grouped.size).toBe(2)
+	expect(
+		grouped
+			.get('exercises/01.ping/01.problem.connect')
+			?.map((entry) => entry.sha),
+	).toEqual(['sha-problem-readme', 'sha-problem-index'])
+	expect(
+		grouped
+			.get('exercises/01.ping/01.solution.connect')
+			?.map((entry) => entry.sha),
+	).toEqual(['sha-solution-index'])
+})
+
 test('splitIntoChunks is deterministic with overlap', () => {
 	const longContent = Array.from(
 		{ length: 220 },

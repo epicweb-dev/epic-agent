@@ -459,6 +459,19 @@ function parseStepFromPath(path: string) {
 	}
 }
 
+function groupStepFilesByDirectory(entries: Array<GitTreeEntry>) {
+	const filesByStepDir = new Map<string, Array<GitTreeEntry>>()
+	for (const entry of entries) {
+		if (entry.type !== 'blob') continue
+		const parsedStep = parseStepFromPath(entry.path)
+		if (!parsedStep) continue
+		const files = filesByStepDir.get(parsedStep.stepDir) ?? []
+		files.push(entry)
+		filesByStepDir.set(parsedStep.stepDir, files)
+	}
+	return filesByStepDir
+}
+
 function compareByNumberThenName(
 	left: { exerciseNumber: number; title: string },
 	right: { exerciseNumber: number; title: string },
@@ -512,6 +525,7 @@ function formatGitHubApiError({
 export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
+	groupStepFilesByDirectory,
 	splitIntoChunks,
 	buildUniqueVectorIdBatches,
 	collectVectorIds,
@@ -678,6 +692,7 @@ async function indexWorkshopRepository({
 }): Promise<RepoIndexResult> {
 	const treePayload = await getRepoTree({ env, repo })
 	const treeByPath = groupTreeEntries(treePayload.tree)
+	const stepFilesByDirectory = groupStepFilesByDirectory(treePayload.tree)
 	const readBlob = await buildBlobReader({ env, repo })
 	const packageEntry = treeByPath.get('package.json')
 	const packageJson = packageEntry ? await readBlob(packageEntry.sha) : null
@@ -876,14 +891,10 @@ async function indexWorkshopRepository({
 			}
 
 			const problemFiles = step.problemDir
-				? Array.from(treeByPath.values()).filter((entry) =>
-						entry.path.startsWith(`${step.problemDir}/`),
-					)
+				? (stepFilesByDirectory.get(step.problemDir) ?? [])
 				: []
 			const solutionFiles = step.solutionDir
-				? Array.from(treeByPath.values()).filter((entry) =>
-						entry.path.startsWith(`${step.solutionDir}/`),
-					)
+				? (stepFilesByDirectory.get(step.solutionDir) ?? [])
 				: []
 
 			const problemFilesByRelativePath = new Map<string, GitTreeEntry>()
