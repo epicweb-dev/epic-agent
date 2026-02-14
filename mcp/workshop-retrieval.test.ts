@@ -149,6 +149,24 @@ test('searchTopicContext throws clear error without bindings', async () => {
 	)
 })
 
+test('searchTopicContext validates workshop scope before binding checks', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: [],
+	})
+	const env = {
+		APP_DB: db,
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: 'model context protocol',
+			workshop: 'unknown-workshop',
+		}),
+	).rejects.toThrow('Unknown workshop "unknown-workshop".')
+})
+
 test('searchTopicContext requires exerciseNumber when stepNumber is provided', async () => {
 	const { db } = createMockDb({ rowsByVectorId: {} })
 	const env = {

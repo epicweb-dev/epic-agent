@@ -1115,3 +1115,25 @@ test(
 	},
 	{ timeout: defaultTimeoutMs },
 )
+
+test(
+	'search_topic_context validates workshop scope before vector binding checks',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'search_topic_context',
+			arguments: {
+				query: 'model context protocol',
+				workshop: 'unknown-workshop',
+			},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain('Unknown workshop "unknown-workshop".')
+		expect(textOutput).not.toContain('Vector search is unavailable')
+	},
+	{ timeout: defaultTimeoutMs },
+)

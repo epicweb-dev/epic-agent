@@ -491,14 +491,6 @@ export async function searchTopicContext({
 			'exerciseNumber is required when stepNumber is provided for topic search.',
 		)
 	}
-	const vectorEnv = env as VectorSearchEnv
-	const vectorIndex = vectorEnv.WORKSHOP_VECTOR_INDEX
-	const ai = vectorEnv.AI
-	if (!vectorIndex || !ai) {
-		throw new Error(
-			'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
-		)
-	}
 	if (workshop) {
 		const workshopFound = await workshopExists(env.APP_DB, workshop)
 		if (!workshopFound) {
@@ -550,6 +542,14 @@ export async function searchTopicContext({
 					: `Unknown step ${stepNumber} for exercise ${requiredExerciseNumber}.`,
 			)
 		}
+	}
+	const vectorEnv = env as VectorSearchEnv
+	const vectorIndex = vectorEnv.WORKSHOP_VECTOR_INDEX
+	const ai = vectorEnv.AI
+	if (!vectorIndex || !ai) {
+		throw new Error(
+			'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
+		)
 	}
 
 	const topK = Math.min(Math.max(limit ?? defaultVectorSearchLimit, 1), 20)
