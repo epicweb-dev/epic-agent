@@ -385,6 +385,11 @@ export async function searchTopicContext({
 	stepNumber?: number
 }) {
 	const startedAt = Date.now()
+	if (typeof stepNumber === 'number' && typeof exerciseNumber !== 'number') {
+		throw new Error(
+			'exerciseNumber is required when stepNumber is provided for topic search.',
+		)
+	}
 	const vectorEnv = env as VectorSearchEnv
 	const vectorIndex = vectorEnv.WORKSHOP_VECTOR_INDEX
 	const ai = vectorEnv.AI

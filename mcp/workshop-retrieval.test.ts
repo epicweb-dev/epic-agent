@@ -52,6 +52,22 @@ test('searchTopicContext throws clear error without bindings', async () => {
 	)
 })
 
+test('searchTopicContext requires exerciseNumber when stepNumber is provided', async () => {
+	const env = {
+		APP_DB: createMockDb({ rowsByVectorId: {} }),
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: 'topic placement',
+			stepNumber: 2,
+		}),
+	).rejects.toThrow(
+		'exerciseNumber is required when stepNumber is provided for topic search.',
+	)
+})
+
 test('searchTopicContext returns ranked matches from vector ids', async () => {
 	let observedTopK = 0
 	let observedFilter: unknown = null
