@@ -72,7 +72,8 @@ Behavior:
 
 - embeds the user query
 - validates optional scope filters (`workshop`, `exerciseNumber`, `stepNumber`)
-  against indexed D1 records before embedding/querying
+  against indexed D1 records before embedding/querying and before checking
+  Vectorize/AI availability
 - queries vector index with optional scope filters
 - resolves matched vector IDs back to chunk + section metadata in D1 using a
   batched lookup
