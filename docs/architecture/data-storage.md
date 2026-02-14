@@ -50,6 +50,10 @@ Workshop indexing is designed to support vector chunk upserts for semantic
 retrieval expansion. The current MVP retrieval path is deterministic and D1
 backed, while Vectorize remains an optional cloud binding.
 
+- MCP tool `search_topic_context` uses Vectorize + Workers AI when configured.
+- If bindings are absent, the tool returns a clear unavailability error instead
+  of failing silently.
+
 ## Configuration reference
 
 Bindings are configured per environment in `wrangler.jsonc`:
