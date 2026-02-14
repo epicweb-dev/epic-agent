@@ -259,7 +259,7 @@ export async function listStoredVectorIdsForWorkshop({
 	const result = await db
 		.prepare(
 			`
-		SELECT vector_id
+		SELECT DISTINCT vector_id
 		FROM indexed_section_chunks
 		WHERE workshop_slug = ? AND vector_id IS NOT NULL AND LENGTH(vector_id) > 0
 	`,
@@ -267,9 +267,13 @@ export async function listStoredVectorIdsForWorkshop({
 		.bind(workshop)
 		.all<{ vector_id?: string | null }>()
 
-	return (result.results ?? [])
-		.map((row) => row.vector_id)
-		.filter((vectorId): vectorId is string => typeof vectorId === 'string')
+	return Array.from(
+		new Set(
+			(result.results ?? [])
+				.map((row) => row.vector_id?.trim())
+				.filter((vectorId): vectorId is string => Boolean(vectorId)),
+		),
+	)
 }
 
 export async function createIndexRun(db: D1Database) {
