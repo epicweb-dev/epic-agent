@@ -39,6 +39,15 @@ Local development uses `.env`, which Wrangler loads automatically:
 - `RESEND_API_BASE_URL` (optional, defaults to `https://api.resend.com`)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
+- `GITHUB_TOKEN` (optional but recommended for workshop indexing rate limits)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required to call manual reindex endpoint)
+- `WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS` (optional, default `50000`)
+- `WORKSHOP_CONTEXT_HARD_MAX_CHARS` (optional, default `80000`)
+
+Manual reindex endpoint:
+
+- `POST /internal/workshop-index/reindex`
+- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>`
 
 Tests use `.env.test` when `CLOUDFLARE_ENV=test` (set by Playwright).
 
@@ -51,3 +60,5 @@ Configure these secrets for deploy workflows:
 - `COOKIE_SECRET` (same format as local)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
+- `GITHUB_TOKEN` (optional, recommended for indexing throughput)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)

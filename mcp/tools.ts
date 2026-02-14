@@ -1,5 +1,15 @@
 import { z } from 'zod'
 import { type MCP } from './index.ts'
+import {
+	listWorkshopsInputSchema,
+	retrieveDiffContextInputSchema,
+	retrieveLearningContextInputSchema,
+} from './workshop-contracts.ts'
+import {
+	retrieveDiffContext,
+	retrieveLearningContext,
+	retrieveWorkshopList,
+} from './workshop-retrieval.ts'
 
 type OperationFn = (left: number, right: number) => number
 
@@ -9,6 +19,17 @@ let operations = {
 	'*': (left, right) => left * right,
 	'/': (left, right) => left / right,
 } satisfies Record<string, OperationFn>
+
+function formatJson(value: unknown) {
+	return JSON.stringify(value, null, 2)
+}
+
+function buildErrorResult(message: string) {
+	return {
+		isError: true,
+		content: [{ type: 'text' as const, text: message }],
+	}
+}
 
 export async function registerTools(agent: MCP) {
 	agent.server.registerTool(
@@ -44,6 +65,105 @@ export async function registerTools(agent: MCP) {
 						text: `The result of ${left} ${operator} ${right} is ${result}`,
 					},
 				],
+			}
+		},
+	)
+
+	agent.server.registerTool(
+		'list_workshops',
+		{
+			description: 'List indexed workshops and metadata coverage',
+			inputSchema: listWorkshopsInputSchema,
+		},
+		async (rawArgs: unknown) => {
+			const args = z.object(listWorkshopsInputSchema).safeParse(rawArgs)
+			if (!args.success) {
+				return buildErrorResult(`Invalid input: ${args.error.message}`)
+			}
+			try {
+				const result = await retrieveWorkshopList({
+					env: agent.requireEnv(),
+					limit: args.data.limit,
+					cursor: args.data.cursor,
+					product: args.data.product,
+					hasDiffs: args.data.hasDiffs,
+				})
+				return {
+					content: [{ type: 'text', text: formatJson(result) }],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(`Unable to list workshops: ${message}`)
+			}
+		},
+	)
+
+	agent.server.registerTool(
+		'retrieve_learning_context',
+		{
+			description:
+				'Retrieve workshop context for quiz authoring by scope or random',
+			inputSchema: {
+				workshop: z.string().trim().min(1).optional(),
+				exerciseNumber: z.coerce.number().int().positive().optional(),
+				stepNumber: z.coerce.number().int().positive().optional(),
+				random: z.boolean().optional(),
+				maxChars: z.coerce.number().int().positive().optional(),
+				cursor: z.string().optional(),
+			},
+		},
+		async (rawArgs: unknown) => {
+			const args = retrieveLearningContextInputSchema.safeParse(rawArgs)
+			if (!args.success) {
+				return buildErrorResult(`Invalid input: ${args.error.message}`)
+			}
+			try {
+				const result = await retrieveLearningContext({
+					env: agent.requireEnv(),
+					input: args.data,
+				})
+				return {
+					content: [{ type: 'text', text: formatJson(result) }],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(
+					`Unable to retrieve learning context: ${message}`,
+				)
+			}
+		},
+	)
+
+	agent.server.registerTool(
+		'retrieve_diff_context',
+		{
+			description: 'Retrieve diff-focused context for an indexed exercise step',
+			inputSchema: retrieveDiffContextInputSchema,
+		},
+		async (rawArgs: unknown) => {
+			const args = z.object(retrieveDiffContextInputSchema).safeParse(rawArgs)
+			if (!args.success) {
+				return buildErrorResult(`Invalid input: ${args.error.message}`)
+			}
+			try {
+				const result = await retrieveDiffContext({
+					env: agent.requireEnv(),
+					workshop: args.data.workshop,
+					exerciseNumber: args.data.exerciseNumber,
+					stepNumber: args.data.stepNumber,
+					focus: args.data.focus,
+					maxChars: args.data.maxChars,
+					cursor: args.data.cursor,
+				})
+				return {
+					content: [{ type: 'text', text: formatJson(result) }],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(`Unable to retrieve diff context: ${message}`)
 			}
 		},
 	)

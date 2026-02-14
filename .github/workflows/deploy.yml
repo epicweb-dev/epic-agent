@@ -143,9 +143,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
         run: |
           echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env production
           echo "$APP_BASE_URL" | bunx wrangler secret put APP_BASE_URL --env production
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env production
+          fi
+          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env production
+          fi
 
       - name: 🗄️ Apply D1 Migrations
         if: github.ref == 'refs/heads/main'

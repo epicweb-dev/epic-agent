@@ -10,6 +10,11 @@ Current schema is defined by migrations in `migrations/`:
 
 - `users`: login identity and password hash
 - `password_resets`: hashed reset tokens with expiry and foreign key to users
+- `workshop_index_runs`: manual indexing run metadata and counters
+- `indexed_workshops`: indexed workshop manifests and coverage metadata
+- `indexed_exercises`: indexed exercise summaries per workshop
+- `indexed_steps`: indexed problem/solution step pairs
+- `indexed_sections`: retrieval-ready context sections (instructions/code/diffs)
 
 App access pattern:
 
@@ -17,6 +22,8 @@ App access pattern:
   `queryAll`, `exec`)
 - app handlers (for example `server/handlers/auth.ts`) use these helpers for
   database calls
+- MCP retrieval/indexing logic uses direct prepared statements for bulk index
+  writes and ordered section reads
 
 ## KV (`OAUTH_KV`)
 
@@ -34,6 +41,12 @@ MCP server runtime state is hosted via a Durable Object class (`MCP`) in
 
 - The Worker forwards authorized MCP requests to `MCP.serve(...).fetch`
 - Durable Objects provide a stateful execution model for MCP operations
+
+## Vectorize (`WORKSHOP_VECTOR_INDEX`, optional)
+
+Workshop indexing is designed to support vector chunk upserts for semantic
+retrieval expansion. The current MVP retrieval path is deterministic and D1
+backed, while Vectorize remains an optional cloud binding.
 
 ## Configuration reference
 

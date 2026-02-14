@@ -454,6 +454,9 @@ test(
 		const toolNames = result.tools.map((tool) => tool.name)
 
 		expect(toolNames).toContain('do_math')
+		expect(toolNames).toContain('list_workshops')
+		expect(toolNames).toContain('retrieve_learning_context')
+		expect(toolNames).toContain('retrieve_diff_context')
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -481,6 +484,31 @@ test(
 			)?.text ?? ''
 
 		expect(textOutput).toContain('12')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'mcp server executes list_workshops tool with empty index',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				limit: 5,
+			},
+		})
+
+		const textOutput =
+			(result as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+
+		expect(textOutput).toContain('"workshops"')
 	},
 	{ timeout: defaultTimeoutMs },
 )
