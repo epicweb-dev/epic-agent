@@ -74,6 +74,15 @@ export type IndexedSectionWrite = {
 	isDiff?: boolean
 }
 
+export type IndexedSectionChunkWrite = {
+	exerciseNumber?: number
+	stepNumber?: number
+	sectionOrder: number
+	chunkIndex: number
+	content: string
+	vectorId?: string
+}
+
 function encodeCursor(cursor: PaginationCursor) {
 	return btoa(JSON.stringify(cursor))
 }
@@ -322,6 +331,7 @@ export async function replaceWorkshopIndex({
 	exercises,
 	steps,
 	sections,
+	sectionChunks,
 }: {
 	db: D1Database
 	runId: string
@@ -329,11 +339,16 @@ export async function replaceWorkshopIndex({
 	exercises: Array<IndexedExerciseWrite>
 	steps: Array<IndexedStepWrite>
 	sections: Array<IndexedSectionWrite>
+	sectionChunks: Array<IndexedSectionChunkWrite>
 }) {
 	await db.exec('BEGIN')
 	try {
 		await db
 			.prepare(`DELETE FROM indexed_sections WHERE workshop_slug = ?`)
+			.bind(workshop.workshopSlug)
+			.run()
+		await db
+			.prepare(`DELETE FROM indexed_section_chunks WHERE workshop_slug = ?`)
 			.bind(workshop.workshopSlug)
 			.run()
 		await db
@@ -458,6 +473,37 @@ export async function replaceWorkshopIndex({
 					section.content,
 					section.content.length,
 					section.isDiff ? 1 : 0,
+					runId,
+				)
+				.run()
+		}
+
+		for (const sectionChunk of sectionChunks) {
+			await db
+				.prepare(
+					`
+				INSERT INTO indexed_section_chunks (
+					workshop_slug,
+					exercise_number,
+					step_number,
+					section_order,
+					chunk_index,
+					content,
+					char_count,
+					vector_id,
+					index_run_id
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+				)
+				.bind(
+					workshop.workshopSlug,
+					sectionChunk.exerciseNumber ?? null,
+					sectionChunk.stepNumber ?? null,
+					sectionChunk.sectionOrder,
+					sectionChunk.chunkIndex,
+					sectionChunk.content,
+					sectionChunk.content.length,
+					sectionChunk.vectorId ?? null,
 					runId,
 				)
 				.run()

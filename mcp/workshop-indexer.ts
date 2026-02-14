@@ -3,6 +3,7 @@ import {
 	markIndexRunComplete,
 	markIndexRunFailed,
 	replaceWorkshopIndex,
+	type IndexedSectionChunkWrite,
 	type IndexedExerciseWrite,
 	type IndexedSectionWrite,
 	type IndexedStepWrite,
@@ -29,6 +30,7 @@ type RepoIndexResult = {
 	exercises: Array<IndexedExerciseWrite>
 	steps: Array<IndexedStepWrite>
 	sections: Array<IndexedSectionWrite>
+	sectionChunks: Array<IndexedSectionChunkWrite>
 }
 
 type IndexSummary = {
@@ -37,15 +39,20 @@ type IndexSummary = {
 	exerciseCount: number
 	stepCount: number
 	sectionCount: number
+	sectionChunkCount: number
 }
 
 type WorkshopIndexEnv = Env & {
 	GITHUB_TOKEN?: string
+	WORKSHOP_VECTOR_INDEX?: Vectorize
+	AI?: Ai
 }
 
 const workshopOrg = 'epicweb-dev'
 const defaultSearchPageSize = 100
 const maxStoredSectionChars = 20_000
+const defaultChunkSize = 1_600
+const defaultChunkOverlap = 180
 
 const textFileExtensions = new Set([
 	'.ts',
@@ -144,6 +151,124 @@ function cleanTitle(value: string | undefined, fallback: string) {
 function toSectionContent(content: string) {
 	if (content.length <= maxStoredSectionChars) return content
 	return `${content.slice(0, maxStoredSectionChars)}\n\n[truncated for storage]`
+}
+
+function splitIntoChunks({
+	content,
+	chunkSize = defaultChunkSize,
+	chunkOverlap = defaultChunkOverlap,
+}: {
+	content: string
+	chunkSize?: number
+	chunkOverlap?: number
+}) {
+	const normalizedContent = normalizeNewlines(content).trim()
+	if (normalizedContent.length === 0) return []
+	const size = Math.max(300, chunkSize)
+	const overlap = Math.max(0, Math.min(chunkOverlap, size - 100))
+	const chunks: Array<{ chunkIndex: number; content: string }> = []
+	let cursor = 0
+	let chunkIndex = 0
+	while (cursor < normalizedContent.length) {
+		const end = Math.min(normalizedContent.length, cursor + size)
+		const chunk = normalizedContent.slice(cursor, end).trim()
+		if (chunk.length > 0) {
+			chunks.push({ chunkIndex, content: chunk })
+			chunkIndex += 1
+		}
+		if (end >= normalizedContent.length) break
+		cursor = end - overlap
+	}
+	return chunks
+}
+
+async function embedChunksIfConfigured({
+	env,
+	runId,
+	workshopSlug,
+	sectionChunks,
+}: {
+	env: WorkshopIndexEnv
+	runId: string
+	workshopSlug: string
+	sectionChunks: Array<
+		IndexedSectionChunkWrite & {
+			exerciseNumber?: number
+			stepNumber?: number
+			sectionOrder: number
+		}
+	>
+}) {
+	if (sectionChunks.length === 0) return sectionChunks
+	const vectorIndex = env.WORKSHOP_VECTOR_INDEX
+	const ai = env.AI
+	if (!vectorIndex || !ai) {
+		return sectionChunks
+	}
+
+	const texts = sectionChunks.map((chunk) => chunk.content)
+	const embeddingResponse = (await ai.run('@cf/baai/bge-base-en-v1.5', {
+		text: texts,
+	})) as unknown
+
+	let vectors: Array<Array<number>> = []
+	if (
+		embeddingResponse &&
+		typeof embeddingResponse === 'object' &&
+		'data' in embeddingResponse &&
+		Array.isArray((embeddingResponse as { data?: unknown }).data)
+	) {
+		vectors = (embeddingResponse as { data: Array<Array<number>> }).data
+	} else if (Array.isArray(embeddingResponse)) {
+		vectors = embeddingResponse as Array<Array<number>>
+	}
+
+	if (vectors.length !== sectionChunks.length) {
+		console.warn(
+			'workshop-reindex-embedding-length-mismatch',
+			JSON.stringify({
+				runId,
+				workshopSlug,
+				expected: sectionChunks.length,
+				received: vectors.length,
+			}),
+		)
+		return sectionChunks
+	}
+
+	const vectorIdsByIndex: Array<string | undefined> = []
+	const vectorPayloads = sectionChunks.flatMap((chunk, index) => {
+		const values = vectors[index]
+		if (!Array.isArray(values) || values.length === 0) {
+			vectorIdsByIndex[index] = undefined
+			return []
+		}
+		const vectorId = `${runId}:${workshopSlug}:${chunk.sectionOrder}:${chunk.chunkIndex}`
+		vectorIdsByIndex[index] = vectorId
+		return [
+			{
+				id: vectorId,
+				values,
+				metadata: {
+					workshop_slug: workshopSlug,
+					exercise_number: chunk.exerciseNumber ?? -1,
+					step_number: chunk.stepNumber ?? -1,
+					section_order: chunk.sectionOrder,
+					chunk_index: chunk.chunkIndex,
+					index_run_id: runId,
+				},
+			},
+		]
+	})
+
+	if (vectorPayloads.length > 0) {
+		await vectorIndex.upsert(vectorPayloads)
+	}
+
+	return sectionChunks.map((chunk, index) => ({
+		...chunk,
+		vectorId: vectorIdsByIndex[index],
+	}))
 }
 
 function wildcardToRegExp(pattern: string) {
@@ -500,6 +625,7 @@ async function indexWorkshopRepository({
 
 	let sectionOrder = 10
 	const sections: Array<IndexedSectionWrite> = []
+	const sectionChunks: Array<IndexedSectionChunkWrite> = []
 	const exercises: Array<IndexedExerciseWrite> = []
 	const steps: Array<IndexedStepWrite> = []
 	let hasDiffs = false
@@ -745,6 +871,19 @@ async function indexWorkshopRepository({
 		}
 	}
 
+	for (const section of sections) {
+		const chunks = splitIntoChunks({ content: section.content })
+		for (const chunk of chunks) {
+			sectionChunks.push({
+				exerciseNumber: section.exerciseNumber,
+				stepNumber: section.stepNumber,
+				sectionOrder: section.sectionOrder,
+				chunkIndex: chunk.chunkIndex,
+				content: chunk.content,
+			})
+		}
+	}
+
 	return {
 		workshop: {
 			workshopSlug,
@@ -760,6 +899,7 @@ async function indexWorkshopRepository({
 		exercises,
 		steps,
 		sections,
+		sectionChunks,
 	}
 }
 
@@ -776,6 +916,7 @@ export async function runWorkshopReindex({
 	let exerciseCount = 0
 	let stepCount = 0
 	let sectionCount = 0
+	let sectionChunkCount = 0
 	const startedAt = Date.now()
 	console.info(
 		'workshop-reindex-start',
@@ -801,6 +942,12 @@ export async function runWorkshopReindex({
 				env,
 				repo: repository,
 			})
+			const embeddedSectionChunks = await embedChunksIfConfigured({
+				env,
+				runId,
+				workshopSlug: indexed.workshop.workshopSlug,
+				sectionChunks: indexed.sectionChunks,
+			})
 			await replaceWorkshopIndex({
 				db,
 				runId,
@@ -808,11 +955,13 @@ export async function runWorkshopReindex({
 				exercises: indexed.exercises,
 				steps: indexed.steps,
 				sections: indexed.sections,
+				sectionChunks: embeddedSectionChunks,
 			})
 			workshopCount += 1
 			exerciseCount += indexed.exercises.length
 			stepCount += indexed.steps.length
 			sectionCount += indexed.sections.length
+			sectionChunkCount += embeddedSectionChunks.length
 			console.info(
 				'workshop-reindex-repository-complete',
 				JSON.stringify({
@@ -821,6 +970,7 @@ export async function runWorkshopReindex({
 					exerciseCount: indexed.exercises.length,
 					stepCount: indexed.steps.length,
 					sectionCount: indexed.sections.length,
+					sectionChunkCount: embeddedSectionChunks.length,
 					durationMs: Date.now() - repositoryStart,
 				}),
 			)
@@ -842,6 +992,7 @@ export async function runWorkshopReindex({
 				exerciseCount,
 				stepCount,
 				sectionCount,
+				sectionChunkCount,
 				durationMs: Date.now() - startedAt,
 			}),
 		)
@@ -851,6 +1002,7 @@ export async function runWorkshopReindex({
 			exerciseCount,
 			stepCount,
 			sectionCount,
+			sectionChunkCount,
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)

@@ -15,6 +15,7 @@ Current schema is defined by migrations in `migrations/`:
 - `indexed_exercises`: indexed exercise summaries per workshop
 - `indexed_steps`: indexed problem/solution step pairs
 - `indexed_sections`: retrieval-ready context sections (instructions/code/diffs)
+- `indexed_section_chunks`: chunked section content for optional vector indexing
 
 App access pattern:
 
