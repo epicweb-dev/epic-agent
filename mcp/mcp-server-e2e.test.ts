@@ -747,7 +747,9 @@ test(
 		expect(parsedContinuationOutput.sections[0]?.label).toBe(
 			'Problem instructions',
 		)
-		expect(parsedContinuationOutput.sections[0]?.content.length).toBeGreaterThan(0)
+		expect(
+			parsedContinuationOutput.sections[0]?.content.length,
+		).toBeGreaterThan(0)
 
 		const diffResult = await mcpClient.client.callTool({
 			name: 'retrieve_diff_context',
