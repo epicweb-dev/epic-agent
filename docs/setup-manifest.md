@@ -63,6 +63,8 @@ Configure these secrets for deploy workflows:
 
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
+- `CLOUDFLARE_ACCOUNT_ID` (recommended for reliable token-based Wrangler
+  commands in CI)
 - `COOKIE_SECRET` (same format as local)
 - `APP_BASE_URL` (production base URL)
 - `APP_BASE_URL_PREVIEW` (optional preview base URL; falls back to
