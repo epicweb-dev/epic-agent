@@ -53,6 +53,8 @@ backed, while Vectorize remains an optional cloud binding.
 - MCP tool `search_topic_context` uses Vectorize + Workers AI when configured.
 - Reindex replaces per-workshop chunk vectors and removes prior vector IDs in
   batches to reduce stale semantic matches.
+- If a repository write fails after fresh vector upsert, reindex attempts a
+  best-effort rollback delete of the newly inserted vector IDs.
 - If bindings are absent, the tool returns a clear unavailability error instead
   of failing silently.
 

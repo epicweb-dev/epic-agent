@@ -202,6 +202,16 @@ function buildUniqueVectorIdBatches({
 	return batches
 }
 
+function collectVectorIds(
+	sectionChunks: Array<{
+		vectorId?: string
+	}>,
+) {
+	return sectionChunks
+		.map((sectionChunk) => sectionChunk.vectorId?.trim())
+		.filter((vectorId): vectorId is string => Boolean(vectorId))
+}
+
 async function deleteVectorIdsIfConfigured({
 	env,
 	runId,
@@ -504,6 +514,7 @@ export const workshopIndexerTestUtils = {
 	parseStepFromPath,
 	splitIntoChunks,
 	buildUniqueVectorIdBatches,
+	collectVectorIds,
 	deleteVectorIdsIfConfigured,
 	createSimpleUnifiedDiff,
 	shouldIgnoreDiffPath,
@@ -1071,15 +1082,37 @@ export async function runWorkshopReindex({
 				workshopSlug: indexed.workshop.workshopSlug,
 				sectionChunks: indexed.sectionChunks,
 			})
-			await replaceWorkshopIndex({
-				db,
-				runId,
-				workshop: indexed.workshop,
-				exercises: indexed.exercises,
-				steps: indexed.steps,
-				sections: indexed.sections,
-				sectionChunks: embeddedSectionChunks,
-			})
+			const insertedVectorIds = collectVectorIds(embeddedSectionChunks)
+			try {
+				await replaceWorkshopIndex({
+					db,
+					runId,
+					workshop: indexed.workshop,
+					exercises: indexed.exercises,
+					steps: indexed.steps,
+					sections: indexed.sections,
+					sectionChunks: embeddedSectionChunks,
+				})
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				const rollbackVectorCount = await deleteVectorIdsIfConfigured({
+					env,
+					runId,
+					workshopSlug: indexed.workshop.workshopSlug,
+					vectorIds: insertedVectorIds,
+				})
+				console.warn(
+					'workshop-reindex-repository-rollback',
+					JSON.stringify({
+						runId,
+						repository: repository.name,
+						insertedVectorCount: insertedVectorIds.length,
+						rollbackVectorCount,
+						error: message,
+					}),
+				)
+				throw error
+			}
 			const deletedVectorCount = await deleteVectorIdsIfConfigured({
 				env,
 				runId,
@@ -1100,6 +1133,7 @@ export async function runWorkshopReindex({
 					stepCount: indexed.steps.length,
 					sectionCount: indexed.sections.length,
 					sectionChunkCount: embeddedSectionChunks.length,
+					insertedVectorCount: insertedVectorIds.length,
 					deletedVectorCount,
 					durationMs: Date.now() - repositoryStart,
 				}),

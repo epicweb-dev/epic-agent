@@ -63,6 +63,16 @@ test('buildUniqueVectorIdBatches dedupes and chunks vector ids', () => {
 	])
 })
 
+test('collectVectorIds trims and drops empty values', () => {
+	const vectorIds = workshopIndexerTestUtils.collectVectorIds([
+		{ vectorId: ' first ' },
+		{ vectorId: '' },
+		{},
+		{ vectorId: 'second' },
+	])
+	expect(vectorIds).toEqual(['first', 'second'])
+})
+
 test('deleteVectorIdsIfConfigured deletes deduped vector batches', async () => {
 	const calls: Array<Array<string>> = []
 	const deletedCount =
