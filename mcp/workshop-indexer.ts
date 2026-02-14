@@ -207,19 +207,23 @@ async function deleteVectorIdsIfConfigured({
 	runId,
 	workshopSlug,
 	vectorIds,
+	batchSize,
 }: {
 	env: WorkshopIndexEnv
 	runId: string
 	workshopSlug: string
 	vectorIds: Array<string>
+	batchSize?: number
 }) {
 	const vectorIndex = env.WORKSHOP_VECTOR_INDEX
-	if (!vectorIndex || vectorIds.length === 0) return
+	if (!vectorIndex || vectorIds.length === 0) return 0
 
-	const batches = buildUniqueVectorIdBatches({ vectorIds })
+	const batches = buildUniqueVectorIdBatches({ vectorIds, batchSize })
+	let deletedVectorCount = 0
 	for (const batch of batches) {
 		try {
 			await vectorIndex.deleteByIds(batch)
+			deletedVectorCount += batch.length
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			console.warn(
@@ -227,12 +231,14 @@ async function deleteVectorIdsIfConfigured({
 				JSON.stringify({
 					runId,
 					workshopSlug,
-					vectorCount: batch.length,
+					batchSize: batch.length,
 					error: message,
 				}),
 			)
 		}
 	}
+
+	return deletedVectorCount
 }
 
 async function embedChunksIfConfigured({
@@ -498,6 +504,7 @@ export const workshopIndexerTestUtils = {
 	parseStepFromPath,
 	splitIntoChunks,
 	buildUniqueVectorIdBatches,
+	deleteVectorIdsIfConfigured,
 	createSimpleUnifiedDiff,
 	shouldIgnoreDiffPath,
 	formatGitHubApiError,
@@ -1073,7 +1080,7 @@ export async function runWorkshopReindex({
 				sections: indexed.sections,
 				sectionChunks: embeddedSectionChunks,
 			})
-			await deleteVectorIdsIfConfigured({
+			const deletedVectorCount = await deleteVectorIdsIfConfigured({
 				env,
 				runId,
 				workshopSlug: indexed.workshop.workshopSlug,
@@ -1093,6 +1100,7 @@ export async function runWorkshopReindex({
 					stepCount: indexed.steps.length,
 					sectionCount: indexed.sections.length,
 					sectionChunkCount: embeddedSectionChunks.length,
+					deletedVectorCount,
 					durationMs: Date.now() - repositoryStart,
 				}),
 			)

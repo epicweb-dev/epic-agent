@@ -63,6 +63,51 @@ test('buildUniqueVectorIdBatches dedupes and chunks vector ids', () => {
 	])
 })
 
+test('deleteVectorIdsIfConfigured deletes deduped vector batches', async () => {
+	const calls: Array<Array<string>> = []
+	const deletedCount =
+		await workshopIndexerTestUtils.deleteVectorIdsIfConfigured({
+			env: {
+				WORKSHOP_VECTOR_INDEX: {
+					deleteByIds: async (ids: Array<string>) => {
+						calls.push(ids)
+						return { count: ids.length }
+					},
+				} as unknown as Vectorize,
+			} as Env,
+			runId: 'run-test',
+			workshopSlug: 'example-workshop',
+			vectorIds: [' v1 ', 'v2', 'v2', 'v3'],
+			batchSize: 3,
+		})
+	expect(calls).toEqual([['v1', 'v2', 'v3']])
+	expect(deletedCount).toBe(3)
+})
+
+test('deleteVectorIdsIfConfigured continues when one batch fails', async () => {
+	const calls: Array<Array<string>> = []
+	const deletedCount =
+		await workshopIndexerTestUtils.deleteVectorIdsIfConfigured({
+			env: {
+				WORKSHOP_VECTOR_INDEX: {
+					deleteByIds: async (ids: Array<string>) => {
+						calls.push(ids)
+						if (ids.includes('v1')) {
+							throw new Error('simulated delete failure')
+						}
+						return { count: ids.length }
+					},
+				} as unknown as Vectorize,
+			} as Env,
+			runId: 'run-test',
+			workshopSlug: 'example-workshop',
+			vectorIds: ['v1', 'v2', 'v3', 'v4'],
+			batchSize: 3,
+		})
+	expect(calls).toEqual([['v1', 'v2', 'v3'], ['v4']])
+	expect(deletedCount).toBe(1)
+})
+
 test('createSimpleUnifiedDiff includes changed lines', () => {
 	const diff = workshopIndexerTestUtils.createSimpleUnifiedDiff({
 		path: 'src/index.ts',
