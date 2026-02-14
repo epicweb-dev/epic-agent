@@ -1,0 +1,106 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "epic-agent",
+	"compatibility_date": "2026-01-31",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"main": "./worker/index.ts",
+	"migrations": [
+		{
+			"new_sqlite_classes": ["MCP"],
+			"tag": "v1",
+		},
+	],
+
+	"observability": {
+		"enabled": true,
+	},
+	"env": {
+		"production": {
+			"assets": {
+				"directory": "./public",
+				"binding": "ASSETS",
+			},
+			"durable_objects": {
+				"bindings": [
+					{
+						"class_name": "MCP",
+						"name": "MCP_OBJECT",
+					},
+				],
+			},
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent",
+					"database_id": "e4d0cda7-96f9-4788-be84-ea5b6ff35545",
+					"migrations_dir": "migrations",
+				},
+			],
+			"kv_namespaces": [
+				{
+					"binding": "OAUTH_KV",
+					"id": "ee7d213b7363433cb95c0d250eb5f2d8",
+					"preview_id": "a28871daf79b489c990e7263d1bce540",
+				},
+			],
+		},
+		"preview": {
+			"assets": {
+				"directory": "./public",
+				"binding": "ASSETS",
+			},
+			"durable_objects": {
+				"bindings": [
+					{
+						"class_name": "MCP",
+						"name": "MCP_OBJECT",
+					},
+				],
+			},
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent-preview",
+					"database_id": "28ca4a48-93a9-44de-9395-03fbbdf237ea",
+					"migrations_dir": "migrations",
+				},
+			],
+			"kv_namespaces": [
+				{
+					"binding": "OAUTH_KV",
+					"id": "ee7d213b7363433cb95c0d250eb5f2d8",
+					"preview_id": "a28871daf79b489c990e7263d1bce540",
+				},
+			],
+		},
+		"test": {
+			"assets": {
+				"directory": "./public",
+				"binding": "ASSETS",
+			},
+			"durable_objects": {
+				"bindings": [
+					{
+						"class_name": "MCP",
+						"name": "MCP_OBJECT",
+					},
+				],
+			},
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent-preview",
+					"database_id": "28ca4a48-93a9-44de-9395-03fbbdf237ea",
+					"migrations_dir": "migrations",
+				},
+			],
+			"kv_namespaces": [
+				{
+					"binding": "OAUTH_KV",
+					"id": "ee7d213b7363433cb95c0d250eb5f2d8",
+					"preview_id": "a28871daf79b489c990e7263d1bce540",
+				},
+			],
+		},
+	},
+}
