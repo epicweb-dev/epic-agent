@@ -89,6 +89,50 @@ async function stepExists({
 	return Boolean(row)
 }
 
+async function exerciseExistsAnywhere({
+	db,
+	exerciseNumber,
+}: {
+	db: D1Database
+	exerciseNumber: number
+}) {
+	const row = await db
+		.prepare(
+			`
+		SELECT exercise_number
+		FROM indexed_exercises
+		WHERE exercise_number = ?
+		LIMIT 1
+	`,
+		)
+		.bind(exerciseNumber)
+		.first()
+	return Boolean(row)
+}
+
+async function stepExistsAnywhere({
+	db,
+	exerciseNumber,
+	stepNumber,
+}: {
+	db: D1Database
+	exerciseNumber: number
+	stepNumber: number
+}) {
+	const row = await db
+		.prepare(
+			`
+		SELECT step_number
+		FROM indexed_steps
+		WHERE exercise_number = ? AND step_number = ?
+		LIMIT 1
+	`,
+		)
+		.bind(exerciseNumber, stepNumber)
+		.first()
+	return Boolean(row)
+}
+
 function filterByFocus(sections: Array<RetrievalSection>, focus: string) {
 	const normalized = focus.trim().toLowerCase()
 	if (normalized.length === 0) return sections
@@ -450,6 +494,58 @@ export async function searchTopicContext({
 		throw new Error(
 			'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
 		)
+	}
+	if (workshop) {
+		const workshopFound = await workshopExists(env.APP_DB, workshop)
+		if (!workshopFound) {
+			throw new Error(`Unknown workshop "${workshop}".`)
+		}
+	}
+	if (typeof exerciseNumber === 'number') {
+		const exerciseFound = workshop
+			? await exerciseExists({
+					db: env.APP_DB,
+					workshop,
+					exerciseNumber,
+				})
+			: await exerciseExistsAnywhere({
+					db: env.APP_DB,
+					exerciseNumber,
+				})
+		if (!exerciseFound) {
+			throw new Error(
+				workshop
+					? `Unknown exercise ${exerciseNumber} for workshop "${workshop}".`
+					: `Unknown exercise ${exerciseNumber}.`,
+			)
+		}
+	}
+	if (typeof stepNumber === 'number') {
+		const requiredExerciseNumber = exerciseNumber
+		if (typeof requiredExerciseNumber !== 'number') {
+			throw new Error(
+				'exerciseNumber is required when stepNumber is provided for topic search.',
+			)
+		}
+		const stepFound = workshop
+			? await stepExists({
+					db: env.APP_DB,
+					workshop,
+					exerciseNumber: requiredExerciseNumber,
+					stepNumber,
+				})
+			: await stepExistsAnywhere({
+					db: env.APP_DB,
+					exerciseNumber: requiredExerciseNumber,
+					stepNumber,
+				})
+		if (!stepFound) {
+			throw new Error(
+				workshop
+					? `Unknown step ${stepNumber} for workshop "${workshop}" exercise ${requiredExerciseNumber}.`
+					: `Unknown step ${stepNumber} for exercise ${requiredExerciseNumber}.`,
+			)
+		}
 	}
 
 	const topK = Math.min(Math.max(limit ?? defaultVectorSearchLimit, 1), 20)

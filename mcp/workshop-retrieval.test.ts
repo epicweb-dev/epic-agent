@@ -9,6 +9,11 @@ type MockQueryMatch = {
 
 function createMockDb({
 	rowsByVectorId,
+	workshops = [],
+	workshopExercises = {},
+	globalExercises = [],
+	workshopSteps = {},
+	globalSteps = {},
 }: {
 	rowsByVectorId: Record<
 		string,
@@ -21,11 +26,87 @@ function createMockDb({
 			label?: string | null
 		}
 	>
+	workshops?: Array<string>
+	workshopExercises?: Record<string, Array<number>>
+	globalExercises?: Array<number>
+	workshopSteps?: Record<string, Array<string>>
+	globalSteps?: Record<string, true>
 }) {
 	const observedBindCalls: Array<Array<string>> = []
 	return {
 		db: {
-			prepare() {
+			prepare(query: string) {
+				if (query.includes('FROM indexed_workshops')) {
+					return {
+						bind(workshop: string) {
+							return {
+								async first() {
+									return workshops.includes(workshop)
+										? { workshop_slug: workshop }
+										: null
+								},
+							}
+						},
+					}
+				}
+				if (query.includes('FROM indexed_exercises')) {
+					if (query.includes('workshop_slug = ?')) {
+						return {
+							bind(workshop: string, exerciseNumber: number) {
+								return {
+									async first() {
+										const exercises = workshopExercises[workshop] ?? []
+										return exercises.includes(exerciseNumber)
+											? { exercise_number: exerciseNumber }
+											: null
+									},
+								}
+							},
+						}
+					}
+					return {
+						bind(exerciseNumber: number) {
+							return {
+								async first() {
+									return globalExercises.includes(exerciseNumber)
+										? { exercise_number: exerciseNumber }
+										: null
+								},
+							}
+						},
+					}
+				}
+				if (query.includes('FROM indexed_steps')) {
+					if (query.includes('workshop_slug = ?')) {
+						return {
+							bind(
+								workshop: string,
+								exerciseNumber: number,
+								stepNumber: number,
+							) {
+								return {
+									async first() {
+										const key = `${exerciseNumber}:${stepNumber}`
+										const stepKeys = workshopSteps[workshop] ?? []
+										return stepKeys.includes(key)
+											? { step_number: stepNumber }
+											: null
+									},
+								}
+							},
+						}
+					}
+					return {
+						bind(exerciseNumber: number, stepNumber: number) {
+							return {
+								async first() {
+									const key = `${exerciseNumber}:${stepNumber}`
+									return globalSteps[key] ? { step_number: stepNumber } : null
+								},
+							}
+						},
+					}
+				}
 				return {
 					bind(...vectorIds: Array<string>) {
 						observedBindCalls.push(vectorIds)
@@ -131,6 +212,8 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 				label: 'Solution instructions',
 			},
 		},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [2] },
 	})
 	const env = {
 		AI: ai,
@@ -165,4 +248,43 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 		chunk: 'MCP intro and architecture',
 		vectorId: 'run:workshop:10:0',
 	})
+})
+
+test('searchTopicContext validates workshop filter scope before embedding', async () => {
+	let embeddingCalls = 0
+	const ai = {
+		async run() {
+			embeddingCalls += 1
+			return {
+				data: [[0.12, 0.34, 0.56]],
+			}
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query() {
+			return {
+				matches: [],
+				count: 0,
+			}
+		},
+	} as unknown as Vectorize
+
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: [],
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: 'schema validation',
+			workshop: 'unknown-workshop',
+		}),
+	).rejects.toThrow('Unknown workshop "unknown-workshop".')
+	expect(embeddingCalls).toBe(0)
 })
