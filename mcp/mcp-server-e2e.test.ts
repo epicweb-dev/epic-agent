@@ -718,6 +718,36 @@ test(
 			)?.text ?? ''
 		expect(learningOutput).toContain('"truncated": true')
 		expect(learningOutput).toContain('"nextCursor"')
+		const parsedLearningOutput = JSON.parse(learningOutput) as {
+			nextCursor?: string
+		}
+		expect(typeof parsedLearningOutput.nextCursor).toBe('string')
+
+		const learningContinuation = await mcpClient.client.callTool({
+			name: 'retrieve_learning_context',
+			arguments: {
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 1,
+				stepNumber: 1,
+				maxChars: 35,
+				cursor: parsedLearningOutput.nextCursor,
+			},
+		})
+		const continuationOutput =
+			(learningContinuation as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		const parsedContinuationOutput = JSON.parse(continuationOutput) as {
+			sections: Array<{ label: string; content: string }>
+			truncated: boolean
+		}
+		expect(parsedContinuationOutput.truncated).toBe(true)
+		expect(parsedContinuationOutput.sections.length).toBeGreaterThan(0)
+		expect(parsedContinuationOutput.sections[0]?.label).toBe(
+			'Problem instructions',
+		)
+		expect(parsedContinuationOutput.sections[0]?.content.length).toBeGreaterThan(0)
 
 		const diffResult = await mcpClient.client.callTool({
 			name: 'retrieve_diff_context',

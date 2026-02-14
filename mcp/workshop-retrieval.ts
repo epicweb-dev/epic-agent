@@ -109,6 +109,7 @@ export async function retrieveWorkshopList({
 	product?: string
 	hasDiffs?: boolean
 }) {
+	const startedAt = Date.now()
 	const maxLimit = Math.min(Math.max(limit ?? 20, 1), 100)
 	const result = await listIndexedWorkshops({
 		db: env.APP_DB,
@@ -117,6 +118,17 @@ export async function retrieveWorkshopList({
 		product,
 		hasDiffs,
 	})
+	console.info(
+		'mcp-list-workshops',
+		JSON.stringify({
+			limit: maxLimit,
+			product,
+			hasDiffs,
+			workshopCount: result.workshops.length,
+			hasNextCursor: Boolean(result.nextCursor),
+			durationMs: Date.now() - startedAt,
+		}),
+	)
 	return {
 		workshops: result.workshops,
 		nextCursor: result.nextCursor ?? undefined,
@@ -130,6 +142,7 @@ export async function retrieveLearningContext({
 	env: Env
 	input: RetrieveLearningContextInput
 }) {
+	const startedAt = Date.now()
 	const { defaultMaxChars, hardMaxChars } = resolvePayloadLimits(env)
 	const maxChars = clampMaxChars({
 		requested: input.maxChars,
@@ -202,6 +215,20 @@ export async function retrieveLearningContext({
 		maxChars,
 		cursor: input.cursor,
 	})
+	console.info(
+		'mcp-retrieve-learning-context',
+		JSON.stringify({
+			workshop,
+			exerciseNumber,
+			stepNumber,
+			random: input.random === true,
+			sectionCount: truncatedResult.sections.length,
+			truncated: truncatedResult.truncated,
+			hasNextCursor: Boolean(truncatedResult.nextCursor),
+			maxChars,
+			durationMs: Date.now() - startedAt,
+		}),
+	)
 
 	return {
 		workshop,
@@ -230,6 +257,7 @@ export async function retrieveDiffContext({
 	maxChars?: number
 	cursor?: string
 }) {
+	const startedAt = Date.now()
 	const workshopFound = await workshopExists(env.APP_DB, workshop)
 	if (!workshopFound) {
 		throw new Error(`Unknown workshop "${workshop}".`)
@@ -287,6 +315,20 @@ export async function retrieveDiffContext({
 		maxChars: effectiveMaxChars,
 		cursor,
 	})
+	console.info(
+		'mcp-retrieve-diff-context',
+		JSON.stringify({
+			workshop,
+			exerciseNumber,
+			stepNumber,
+			focus,
+			diffSectionCount: truncatedResult.sections.length,
+			truncated: truncatedResult.truncated,
+			hasNextCursor: Boolean(truncatedResult.nextCursor),
+			maxChars: effectiveMaxChars,
+			durationMs: Date.now() - startedAt,
+		}),
+	)
 
 	return {
 		workshop,

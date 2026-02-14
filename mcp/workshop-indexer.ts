@@ -776,10 +776,27 @@ export async function runWorkshopReindex({
 	let exerciseCount = 0
 	let stepCount = 0
 	let sectionCount = 0
+	const startedAt = Date.now()
+	console.info(
+		'workshop-reindex-start',
+		JSON.stringify({
+			runId,
+			onlyWorkshops: onlyWorkshops?.length ?? 0,
+			timestamp: new Date(startedAt).toISOString(),
+		}),
+	)
 
 	try {
 		const repositories = await listWorkshopRepositories({ env, onlyWorkshops })
+		console.info(
+			'workshop-reindex-discovery',
+			JSON.stringify({
+				runId,
+				repositoryCount: repositories.length,
+			}),
+		)
 		for (const repository of repositories) {
+			const repositoryStart = Date.now()
 			const indexed = await indexWorkshopRepository({
 				env,
 				repo: repository,
@@ -796,6 +813,17 @@ export async function runWorkshopReindex({
 			exerciseCount += indexed.exercises.length
 			stepCount += indexed.steps.length
 			sectionCount += indexed.sections.length
+			console.info(
+				'workshop-reindex-repository-complete',
+				JSON.stringify({
+					runId,
+					repository: repository.name,
+					exerciseCount: indexed.exercises.length,
+					stepCount: indexed.steps.length,
+					sectionCount: indexed.sections.length,
+					durationMs: Date.now() - repositoryStart,
+				}),
+			)
 		}
 
 		await markIndexRunComplete({
@@ -806,6 +834,17 @@ export async function runWorkshopReindex({
 			stepCount,
 			sectionCount,
 		})
+		console.info(
+			'workshop-reindex-complete',
+			JSON.stringify({
+				runId,
+				workshopCount,
+				exerciseCount,
+				stepCount,
+				sectionCount,
+				durationMs: Date.now() - startedAt,
+			}),
+		)
 		return {
 			runId,
 			workshopCount,
@@ -820,6 +859,14 @@ export async function runWorkshopReindex({
 			runId,
 			errorMessage: message.slice(0, 4000),
 		})
+		console.error(
+			'workshop-reindex-failed',
+			JSON.stringify({
+				runId,
+				error: message,
+				durationMs: Date.now() - startedAt,
+			}),
+		)
 		throw error
 	}
 }
