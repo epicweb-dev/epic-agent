@@ -74,3 +74,31 @@ test('shouldIgnoreDiffPath respects wildcard patterns', () => {
 	expect(ignored).toBe(true)
 	expect(notIgnored).toBe(false)
 })
+
+test('formatGitHubApiError suggests adding token for unauthenticated rate limits', () => {
+	const message = workshopIndexerTestUtils.formatGitHubApiError({
+		status: 403,
+		pathname: '/repos/epicweb-dev/mcp-fundamentals/git/blobs/demo',
+		responseBody: 'API rate limit exceeded for 1.2.3.4',
+		tokenProvided: false,
+		rateLimitRemaining: '0',
+		rateLimitReset: '1730000000',
+	})
+	expect(message).toContain(
+		'Set GITHUB_TOKEN to increase GitHub API rate limits',
+	)
+	expect(message).toContain('Rate limit remaining: 0')
+	expect(message).toContain('Rate limit reset epoch: 1730000000')
+})
+
+test('formatGitHubApiError suggests retry for tokened rate limits', () => {
+	const message = workshopIndexerTestUtils.formatGitHubApiError({
+		status: 403,
+		pathname: '/search/repositories',
+		responseBody: 'Secondary rate limit exceeded',
+		tokenProvided: true,
+		rateLimitRemaining: '12',
+	})
+	expect(message).toContain('configured GITHUB_TOKEN appears rate-limited')
+	expect(message).toContain('Rate limit remaining: 12')
+})

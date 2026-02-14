@@ -400,12 +400,53 @@ function compareByNumberThenName(
 	return left.title.localeCompare(right.title)
 }
 
+function formatGitHubApiError({
+	status,
+	pathname,
+	responseBody,
+	tokenProvided,
+	rateLimitRemaining,
+	rateLimitReset,
+}: {
+	status: number
+	pathname: string
+	responseBody: string
+	tokenProvided: boolean
+	rateLimitRemaining?: string | null
+	rateLimitReset?: string | null
+}) {
+	const body = responseBody.trim()
+	const lowerBody = body.toLowerCase()
+	const isRateLimitError =
+		status === 403 &&
+		(lowerBody.includes('rate limit') ||
+			lowerBody.includes('secondary rate limit'))
+	const rateLimitDetails =
+		rateLimitRemaining !== null && rateLimitRemaining !== undefined
+			? ` Rate limit remaining: ${rateLimitRemaining}.`
+			: ''
+	const rateLimitResetDetails =
+		rateLimitReset !== null && rateLimitReset !== undefined
+			? ` Rate limit reset epoch: ${rateLimitReset}.`
+			: ''
+
+	if (isRateLimitError) {
+		const guidance = tokenProvided
+			? ' The configured GITHUB_TOKEN appears rate-limited; retry later or rotate the token.'
+			: ' Set GITHUB_TOKEN to increase GitHub API rate limits for indexing.'
+		return `GitHub API ${status} for ${pathname}: ${body}.${rateLimitDetails}${rateLimitResetDetails}${guidance}`.trim()
+	}
+
+	return `GitHub API ${status} for ${pathname}: ${body}`
+}
+
 export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
 	splitIntoChunks,
 	createSimpleUnifiedDiff,
 	shouldIgnoreDiffPath,
+	formatGitHubApiError,
 }
 
 async function githubJson<T>({
@@ -433,7 +474,14 @@ async function githubJson<T>({
 	if (!response.ok) {
 		const message = await response.text()
 		throw new Error(
-			`GitHub API ${response.status} for ${url.pathname}: ${message}`,
+			formatGitHubApiError({
+				status: response.status,
+				pathname: url.pathname,
+				responseBody: message,
+				tokenProvided: Boolean(token),
+				rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
+				rateLimitReset: response.headers.get('x-ratelimit-reset'),
+			}),
 		)
 	}
 	return (await response.json()) as T
