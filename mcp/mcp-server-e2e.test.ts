@@ -127,6 +127,173 @@ async function createTestDatabase() {
 	}
 }
 
+async function seedIndexedWorkshopData(persistDir: string) {
+	const runId = `run-${crypto.randomUUID()}`
+	const insertSql = `
+		INSERT INTO workshop_index_runs (
+			id,
+			status,
+			started_at,
+			completed_at,
+			workshop_count,
+			exercise_count,
+			step_count,
+			section_count
+		) VALUES (
+			'${escapeSql(runId)}',
+			'completed',
+			CURRENT_TIMESTAMP,
+			CURRENT_TIMESTAMP,
+			1,
+			1,
+			1,
+			5
+		);
+		INSERT INTO indexed_workshops (
+			workshop_slug,
+			title,
+			product,
+			repo_owner,
+			repo_name,
+			default_branch,
+			source_sha,
+			exercise_count,
+			has_diffs,
+			last_indexed_at,
+			index_run_id
+		) VALUES (
+			'mcp-fundamentals',
+			'MCP Fundamentals',
+			'Epic AI',
+			'epicweb-dev',
+			'mcp-fundamentals',
+			'main',
+			'seed-sha',
+			1,
+			1,
+			CURRENT_TIMESTAMP,
+			'${escapeSql(runId)}'
+		);
+		INSERT INTO indexed_exercises (
+			workshop_slug,
+			exercise_number,
+			title,
+			step_count
+		) VALUES (
+			'mcp-fundamentals',
+			1,
+			'Ping',
+			1
+		);
+		INSERT INTO indexed_steps (
+			workshop_slug,
+			exercise_number,
+			step_number,
+			problem_dir,
+			solution_dir,
+			has_diff
+		) VALUES (
+			'mcp-fundamentals',
+			1,
+			1,
+			'exercises/01.ping/01.problem.connect',
+			'exercises/01.ping/01.solution.connect',
+			1
+		);
+		INSERT INTO indexed_sections (
+			workshop_slug,
+			exercise_number,
+			step_number,
+			section_order,
+			section_kind,
+			label,
+			source_path,
+			content,
+			char_count,
+			is_diff,
+			index_run_id
+		) VALUES
+		(
+			'mcp-fundamentals',
+			1,
+			NULL,
+			10,
+			'exercise-instructions',
+			'Exercise 1 instructions',
+			'exercises/01.ping/README.mdx',
+			'Exercise intro context for ping.',
+			31,
+			0,
+			'${escapeSql(runId)}'
+		),
+		(
+			'mcp-fundamentals',
+			1,
+			1,
+			20,
+			'problem-instructions',
+			'Problem instructions',
+			'exercises/01.ping/01.problem.connect/README.mdx',
+			'Problem context for ping step one.',
+			34,
+			0,
+			'${escapeSql(runId)}'
+		),
+		(
+			'mcp-fundamentals',
+			1,
+			1,
+			30,
+			'solution-instructions',
+			'Solution instructions',
+			'exercises/01.ping/01.solution.connect/README.mdx',
+			'Solution context for ping step one.',
+			35,
+			0,
+			'${escapeSql(runId)}'
+		),
+		(
+			'mcp-fundamentals',
+			1,
+			1,
+			40,
+			'diff-summary',
+			'Diff summary',
+			NULL,
+			'- modified src/index.ts',
+			23,
+			1,
+			'${escapeSql(runId)}'
+		),
+		(
+			'mcp-fundamentals',
+			1,
+			1,
+			50,
+			'diff-hunk',
+			'Diff hunk',
+			'src/index.ts',
+			'diff --git a/src/index.ts b/src/index.ts',
+			39,
+			1,
+			'${escapeSql(runId)}'
+		);
+	`
+
+	await runWrangler([
+		'd1',
+		'execute',
+		'APP_DB',
+		'--local',
+		'--env',
+		'test',
+		'--persist-to',
+		persistDir,
+		'--command',
+		insertSql,
+	])
+}
+
 async function applyMigrations(persistDir: string) {
 	const migrationFiles = await listMigrationFiles()
 	if (migrationFiles.length === 0) {
@@ -509,6 +676,64 @@ test(
 			)?.text ?? ''
 
 		expect(textOutput).toContain('"workshops"')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'mcp retrieval tools return seeded workshop context',
+	async () => {
+		await using database = await createTestDatabase()
+		await seedIndexedWorkshopData(database.persistDir)
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const listResult = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				limit: 5,
+			},
+		})
+		const listOutput =
+			(listResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		expect(listOutput).toContain('mcp-fundamentals')
+		expect(listOutput).toContain('"exerciseCount": 1')
+
+		const learningResult = await mcpClient.client.callTool({
+			name: 'retrieve_learning_context',
+			arguments: {
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 1,
+				stepNumber: 1,
+				maxChars: 35,
+			},
+		})
+		const learningOutput =
+			(learningResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		expect(learningOutput).toContain('"truncated": true')
+		expect(learningOutput).toContain('"nextCursor"')
+
+		const diffResult = await mcpClient.client.callTool({
+			name: 'retrieve_diff_context',
+			arguments: {
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 1,
+				stepNumber: 1,
+			},
+		})
+		const diffOutput =
+			(diffResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		expect(diffOutput).toContain('"diffSections"')
+		expect(diffOutput).toContain('diff --git a/src/index.ts b/src/index.ts')
 	},
 	{ timeout: defaultTimeoutMs },
 )
