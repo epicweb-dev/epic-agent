@@ -70,8 +70,12 @@ Requirements:
 Behavior:
 
 - embeds the user query
+- validates optional scope filters (`workshop`, `exerciseNumber`, `stepNumber`)
+  against indexed D1 records before embedding/querying
 - queries vector index with optional scope filters
-- resolves matched vector IDs back to chunk + section metadata in D1
+- resolves matched vector IDs back to chunk + section metadata in D1 using a
+  batched lookup
+- trims and dedupes matched vector IDs before returning ranked matches
 
 If bindings are missing, the tool returns an explicit unavailability error.
 
