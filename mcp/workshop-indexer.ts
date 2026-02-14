@@ -400,6 +400,14 @@ function compareByNumberThenName(
 	return left.title.localeCompare(right.title)
 }
 
+export const workshopIndexerTestUtils = {
+	parseExerciseFromPath,
+	parseStepFromPath,
+	splitIntoChunks,
+	createSimpleUnifiedDiff,
+	shouldIgnoreDiffPath,
+}
+
 async function githubJson<T>({
 	env,
 	path,
