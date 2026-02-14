@@ -1,5 +1,6 @@
 import {
 	createIndexRun,
+	listStoredVectorIdsForWorkshop,
 	markIndexRunComplete,
 	markIndexRunFailed,
 	replaceWorkshopIndex,
@@ -53,6 +54,7 @@ const defaultSearchPageSize = 100
 const maxStoredSectionChars = 20_000
 const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
+const vectorDeleteBatchSize = 500
 
 const textFileExtensions = new Set([
 	'.ts',
@@ -180,6 +182,57 @@ function splitIntoChunks({
 		cursor = end - overlap
 	}
 	return chunks
+}
+
+function buildUniqueVectorIdBatches({
+	vectorIds,
+	batchSize = vectorDeleteBatchSize,
+}: {
+	vectorIds: Array<string>
+	batchSize?: number
+}) {
+	const uniqueVectorIds = Array.from(
+		new Set(vectorIds.map((vectorId) => vectorId.trim()).filter(Boolean)),
+	)
+	const size = Math.max(1, batchSize)
+	const batches: Array<Array<string>> = []
+	for (let index = 0; index < uniqueVectorIds.length; index += size) {
+		batches.push(uniqueVectorIds.slice(index, index + size))
+	}
+	return batches
+}
+
+async function deleteVectorIdsIfConfigured({
+	env,
+	runId,
+	workshopSlug,
+	vectorIds,
+}: {
+	env: WorkshopIndexEnv
+	runId: string
+	workshopSlug: string
+	vectorIds: Array<string>
+}) {
+	const vectorIndex = env.WORKSHOP_VECTOR_INDEX
+	if (!vectorIndex || vectorIds.length === 0) return
+
+	const batches = buildUniqueVectorIdBatches({ vectorIds })
+	for (const batch of batches) {
+		try {
+			await vectorIndex.deleteByIds(batch)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			console.warn(
+				'workshop-reindex-vector-delete-failed',
+				JSON.stringify({
+					runId,
+					workshopSlug,
+					vectorCount: batch.length,
+					error: message,
+				}),
+			)
+		}
+	}
 }
 
 async function embedChunksIfConfigured({
@@ -444,6 +497,7 @@ export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
 	splitIntoChunks,
+	buildUniqueVectorIdBatches,
 	createSimpleUnifiedDiff,
 	shouldIgnoreDiffPath,
 	formatGitHubApiError,
@@ -1000,6 +1054,10 @@ export async function runWorkshopReindex({
 				env,
 				repo: repository,
 			})
+			const previousVectorIds = await listStoredVectorIdsForWorkshop({
+				db,
+				workshop: indexed.workshop.workshopSlug,
+			})
 			const embeddedSectionChunks = await embedChunksIfConfigured({
 				env,
 				runId,
@@ -1014,6 +1072,12 @@ export async function runWorkshopReindex({
 				steps: indexed.steps,
 				sections: indexed.sections,
 				sectionChunks: embeddedSectionChunks,
+			})
+			await deleteVectorIdsIfConfigured({
+				env,
+				runId,
+				workshopSlug: indexed.workshop.workshopSlug,
+				vectorIds: previousVectorIds,
 			})
 			workshopCount += 1
 			exerciseCount += indexed.exercises.length

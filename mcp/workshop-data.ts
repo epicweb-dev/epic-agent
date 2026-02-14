@@ -249,6 +249,29 @@ export async function listSectionsForScope({
 	return rows.map(mapSectionRow)
 }
 
+export async function listStoredVectorIdsForWorkshop({
+	db,
+	workshop,
+}: {
+	db: D1Database
+	workshop: string
+}) {
+	const result = await db
+		.prepare(
+			`
+		SELECT vector_id
+		FROM indexed_section_chunks
+		WHERE workshop_slug = ? AND vector_id IS NOT NULL AND LENGTH(vector_id) > 0
+	`,
+		)
+		.bind(workshop)
+		.all<{ vector_id?: string | null }>()
+
+	return (result.results ?? [])
+		.map((row) => row.vector_id)
+		.filter((vectorId): vectorId is string => typeof vectorId === 'string')
+}
+
 export async function createIndexRun(db: D1Database) {
 	const runId = crypto.randomUUID()
 	await db

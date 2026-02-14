@@ -52,6 +52,17 @@ test('splitIntoChunks is deterministic with overlap', () => {
 	expect(chunks[0]?.content).not.toBe(chunks[1]?.content)
 })
 
+test('buildUniqueVectorIdBatches dedupes and chunks vector ids', () => {
+	const batches = workshopIndexerTestUtils.buildUniqueVectorIdBatches({
+		vectorIds: [' alpha ', 'beta', '', 'beta', 'gamma', 'delta'],
+		batchSize: 2,
+	})
+	expect(batches).toEqual([
+		['alpha', 'beta'],
+		['gamma', 'delta'],
+	])
+})
+
 test('createSimpleUnifiedDiff includes changed lines', () => {
 	const diff = workshopIndexerTestUtils.createSimpleUnifiedDiff({
 		path: 'src/index.ts',

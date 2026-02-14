@@ -51,6 +51,8 @@ retrieval expansion. The current MVP retrieval path is deterministic and D1
 backed, while Vectorize remains an optional cloud binding.
 
 - MCP tool `search_topic_context` uses Vectorize + Workers AI when configured.
+- Reindex replaces per-workshop chunk vectors and removes prior vector IDs in
+  batches to reduce stale semantic matches.
 - If bindings are absent, the tool returns a clear unavailability error instead
   of failing silently.
 
