@@ -288,3 +288,85 @@ test('searchTopicContext validates workshop filter scope before embedding', asyn
 	).rejects.toThrow('Unknown workshop "unknown-workshop".')
 	expect(embeddingCalls).toBe(0)
 })
+
+test('searchTopicContext validates exercise filter scope before embedding', async () => {
+	let embeddingCalls = 0
+	const ai = {
+		async run() {
+			embeddingCalls += 1
+			return {
+				data: [[0.12, 0.34, 0.56]],
+			}
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query() {
+			return {
+				matches: [],
+				count: 0,
+			}
+		},
+	} as unknown as Vectorize
+
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [1] },
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: 'schema validation',
+			workshop: 'mcp-fundamentals',
+			exerciseNumber: 2,
+		}),
+	).rejects.toThrow('Unknown exercise 2 for workshop "mcp-fundamentals".')
+	expect(embeddingCalls).toBe(0)
+})
+
+test('searchTopicContext validates global step scope before embedding', async () => {
+	let embeddingCalls = 0
+	const ai = {
+		async run() {
+			embeddingCalls += 1
+			return {
+				data: [[0.12, 0.34, 0.56]],
+			}
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query() {
+			return {
+				matches: [],
+				count: 0,
+			}
+		},
+	} as unknown as Vectorize
+
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		globalExercises: [2],
+		globalSteps: {},
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: 'schema validation',
+			exerciseNumber: 2,
+			stepNumber: 3,
+		}),
+	).rejects.toThrow('Unknown step 3 for exercise 2.')
+	expect(embeddingCalls).toBe(0)
+})
