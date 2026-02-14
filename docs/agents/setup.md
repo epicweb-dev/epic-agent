@@ -36,6 +36,12 @@ Quick notes for getting a local epic-agent environment running.
 - `bun run test:e2e` to run Playwright specs.
 - `bun run test:mcp` to run MCP server E2E tests.
 
+## Remote Cloudflare commands with API tokens
+
+When running Wrangler remote commands with `CLOUDFLARE_API_TOKEN`, also set
+`CLOUDFLARE_ACCOUNT_ID` explicitly to avoid account membership lookup failures
+in non-interactive environments.
+
 ## Remix package docs
 
 Use the Remix package index for quick navigation:
