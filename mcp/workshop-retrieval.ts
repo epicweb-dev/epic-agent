@@ -369,6 +369,59 @@ async function embedSearchQuery({ ai, query }: { ai: Ai; query: string }) {
 	throw new Error('Embedding model did not return a valid vector response.')
 }
 
+type TopicChunkLookupRow = {
+	vector_id?: string | null
+	chunk_content?: string
+	workshop_slug?: string
+	exercise_number?: number | null
+	step_number?: number | null
+	section_kind?: string | null
+	label?: string | null
+}
+
+async function loadTopicChunkRows({
+	db,
+	vectorIds,
+}: {
+	db: D1Database
+	vectorIds: Array<string>
+}) {
+	if (vectorIds.length === 0) {
+		return new Map<string, TopicChunkLookupRow>()
+	}
+	const placeholders = vectorIds.map(() => '?').join(', ')
+	const result = await db
+		.prepare(
+			`
+			SELECT
+				c.vector_id,
+				c.content AS chunk_content,
+				c.workshop_slug,
+				c.exercise_number,
+				c.step_number,
+				s.section_kind,
+				s.label
+			FROM indexed_section_chunks c
+			LEFT JOIN indexed_sections s
+				ON s.workshop_slug = c.workshop_slug
+				AND s.exercise_number IS c.exercise_number
+				AND s.step_number IS c.step_number
+				AND s.section_order = c.section_order
+			WHERE c.vector_id IN (${placeholders})
+		`,
+		)
+		.bind(...vectorIds)
+		.all<TopicChunkLookupRow>()
+
+	const rowsByVectorId = new Map<string, TopicChunkLookupRow>()
+	for (const row of result.results ?? []) {
+		const vectorId = row.vector_id?.trim()
+		if (!vectorId || rowsByVectorId.has(vectorId)) continue
+		rowsByVectorId.set(vectorId, row)
+	}
+	return rowsByVectorId
+}
+
 export async function searchTopicContext({
 	env,
 	query,
@@ -412,6 +465,17 @@ export async function searchTopicContext({
 		returnMetadata: 'indexed',
 		filter: Object.keys(filter).length > 0 ? filter : undefined,
 	})
+	const vectorIds = Array.from(
+		new Set(
+			vectorMatches.matches
+				.map((match) => match.id?.trim())
+				.filter((vectorId): vectorId is string => Boolean(vectorId)),
+		),
+	)
+	const chunkRowsByVectorId = await loadTopicChunkRows({
+		db: env.APP_DB,
+		vectorIds,
+	})
 
 	const results: Array<{
 		score: number
@@ -427,34 +491,7 @@ export async function searchTopicContext({
 	for (const match of vectorMatches.matches) {
 		const vectorId = match.id
 		if (!vectorId) continue
-		const row = await env.APP_DB.prepare(
-			`
-			SELECT
-				c.content AS chunk_content,
-				c.workshop_slug,
-				c.exercise_number,
-				c.step_number,
-				s.section_kind,
-				s.label
-			FROM indexed_section_chunks c
-			LEFT JOIN indexed_sections s
-				ON s.workshop_slug = c.workshop_slug
-				AND (s.exercise_number IS c.exercise_number OR (s.exercise_number IS NULL AND c.exercise_number IS NULL))
-				AND (s.step_number IS c.step_number OR (s.step_number IS NULL AND c.step_number IS NULL))
-				AND s.section_order = c.section_order
-			WHERE c.vector_id = ?
-			LIMIT 1
-		`,
-		)
-			.bind(vectorId)
-			.first<{
-				chunk_content?: string
-				workshop_slug?: string
-				exercise_number?: number | null
-				step_number?: number | null
-				section_kind?: string | null
-				label?: string | null
-			}>()
+		const row = chunkRowsByVectorId.get(vectorId)
 		if (!row?.chunk_content || !row.workshop_slug) continue
 		results.push({
 			score: match.score,

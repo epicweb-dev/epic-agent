@@ -22,24 +22,40 @@ function createMockDb({
 		}
 	>
 }) {
+	const observedBindCalls: Array<Array<string>> = []
 	return {
-		prepare() {
-			return {
-				bind(vectorId: string) {
-					return {
-						async first() {
-							return rowsByVectorId[vectorId] ?? null
-						},
-					}
-				},
-			}
-		},
-	} as unknown as D1Database
+		db: {
+			prepare() {
+				return {
+					bind(...vectorIds: Array<string>) {
+						observedBindCalls.push(vectorIds)
+						return {
+							async all() {
+								const results = vectorIds
+									.map((vectorId) => {
+										const row = rowsByVectorId[vectorId]
+										if (!row) return null
+										return {
+											vector_id: vectorId,
+											...row,
+										}
+									})
+									.filter(Boolean)
+								return { results }
+							},
+						}
+					},
+				}
+			},
+		} as unknown as D1Database,
+		observedBindCalls,
+	}
 }
 
 test('searchTopicContext throws clear error without bindings', async () => {
+	const { db } = createMockDb({ rowsByVectorId: {} })
 	const env = {
-		APP_DB: createMockDb({ rowsByVectorId: {} }),
+		APP_DB: db,
 	} as unknown as Env
 
 	await expect(
@@ -53,8 +69,9 @@ test('searchTopicContext throws clear error without bindings', async () => {
 })
 
 test('searchTopicContext requires exerciseNumber when stepNumber is provided', async () => {
+	const { db } = createMockDb({ rowsByVectorId: {} })
 	const env = {
-		APP_DB: createMockDb({ rowsByVectorId: {} }),
+		APP_DB: db,
 	} as unknown as Env
 
 	await expect(
@@ -94,29 +111,30 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 		},
 	} as unknown as Vectorize
 
+	const { db, observedBindCalls } = createMockDb({
+		rowsByVectorId: {
+			'run:workshop:10:0': {
+				chunk_content: 'MCP intro and architecture',
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'problem-instructions',
+				label: 'Problem instructions',
+			},
+			'run:workshop:20:0': {
+				chunk_content: 'Tool schemas and validation',
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 2,
+				step_number: 1,
+				section_kind: 'solution-instructions',
+				label: 'Solution instructions',
+			},
+		},
+	})
 	const env = {
 		AI: ai,
 		WORKSHOP_VECTOR_INDEX: vectorIndex,
-		APP_DB: createMockDb({
-			rowsByVectorId: {
-				'run:workshop:10:0': {
-					chunk_content: 'MCP intro and architecture',
-					workshop_slug: 'mcp-fundamentals',
-					exercise_number: 1,
-					step_number: 1,
-					section_kind: 'problem-instructions',
-					label: 'Problem instructions',
-				},
-				'run:workshop:20:0': {
-					chunk_content: 'Tool schemas and validation',
-					workshop_slug: 'mcp-fundamentals',
-					exercise_number: 2,
-					step_number: 1,
-					section_kind: 'solution-instructions',
-					label: 'Solution instructions',
-				},
-			},
-		}),
+		APP_DB: db,
 	} as unknown as Env
 
 	const result = await searchTopicContext({
@@ -132,6 +150,9 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 		workshop_slug: 'mcp-fundamentals',
 		exercise_number: 2,
 	})
+	expect(observedBindCalls).toEqual([
+		['run:workshop:10:0', 'run:workshop:20:0'],
+	])
 	expect(result.matches.length).toBe(2)
 	expect(result.matches[0]).toEqual({
 		score: 0.91,
