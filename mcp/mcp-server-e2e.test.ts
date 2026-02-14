@@ -1071,3 +1071,26 @@ test(
 	},
 	{ timeout: defaultTimeoutMs },
 )
+
+test(
+	'search_topic_context validates step scope requirements',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'search_topic_context',
+			arguments: {
+				query: 'model context protocol',
+				stepNumber: 2,
+			},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain(
+			'exerciseNumber is required when stepNumber is provided for topic search.',
+		)
+	},
+	{ timeout: defaultTimeoutMs },
+)
