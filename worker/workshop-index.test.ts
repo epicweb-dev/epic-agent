@@ -63,3 +63,70 @@ test('workshop index route validates payload shape', async () => {
 
 	expect(response.status).toBe(400)
 })
+
+test('workshop index route returns reindex summary when authorized', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: ['mcp-fundamentals'],
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 2,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toEqual(['mcp-fundamentals'])
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: true,
+		runId: 'run-123',
+		workshopCount: 1,
+		exerciseCount: 1,
+		stepCount: 1,
+		sectionCount: 1,
+		sectionChunkCount: 2,
+	})
+})
+
+test('workshop index route returns 500 when reindex fails', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+			},
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				throw new Error('boom')
+			},
+		},
+	)
+
+	expect(response.status).toBe(500)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'boom',
+	})
+})

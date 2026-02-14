@@ -30,7 +30,13 @@ function getBearerToken(request: Request) {
 	return header.slice('Bearer '.length).trim()
 }
 
-export async function handleWorkshopIndexRequest(request: Request, env: Env) {
+export async function handleWorkshopIndexRequest(
+	request: Request,
+	env: Env,
+	options: {
+		runWorkshopReindexFn?: typeof runWorkshopReindex
+	} = {},
+) {
 	if (request.method !== 'POST') {
 		return methodNotAllowedResponse()
 	}
@@ -70,8 +76,10 @@ export async function handleWorkshopIndexRequest(request: Request, env: Env) {
 		)
 	}
 
+	const runWorkshopReindexFn = options.runWorkshopReindexFn ?? runWorkshopReindex
+
 	try {
-		const summary = await runWorkshopReindex({
+		const summary = await runWorkshopReindexFn({
 			env,
 			onlyWorkshops: parsedBody.data.workshops,
 		})
