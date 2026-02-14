@@ -155,14 +155,57 @@ jobs:
             echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env production
           fi
 
+      - name: 🔐 Sync Cloudflare Secrets (Preview)
+        if:
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
+        run: |
+          if [ -n "$COOKIE_SECRET" ]; then
+            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview
+          fi
+          if [ -n "$APP_BASE_URL" ]; then
+            echo "$APP_BASE_URL" | bunx wrangler secret put APP_BASE_URL --env preview
+          fi
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview
+          fi
+          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview
+          fi
+
       - name: 🗄️ Apply D1 Migrations
         if: github.ref == 'refs/heads/main'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: bun ./wrangler-env.ts d1 migrations apply epic-agent --remote
 
+      - name: 🗄️ Apply D1 Migrations (Preview)
+        if:
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run:
+          bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
+          preview
+
       - name: ☁️ Deploy to Cloudflare Workers
         if: github.ref == 'refs/heads/main'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bun run deploy
+
+      - name: ☁️ Deploy Preview to Cloudflare Workers
+        if:
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ENV: preview
         run: bun run deploy
