@@ -73,3 +73,7 @@ Configure these secrets for deploy workflows:
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
 - `GITHUB_TOKEN` (optional, recommended for indexing throughput)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)
+
+When PR preview deploys run, CI updates a pull request comment with the preview
+URL (when available from `APP_BASE_URL_PREVIEW`/`APP_BASE_URL`) and a link to
+the workflow run.
