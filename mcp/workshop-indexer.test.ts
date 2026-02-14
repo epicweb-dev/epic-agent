@@ -104,6 +104,14 @@ test('splitIntoChunks is deterministic with overlap', () => {
 	expect(chunks[0]?.content).not.toBe(chunks[1]?.content)
 })
 
+test('chunkIntoBatches creates stable slices', () => {
+	const batches = workshopIndexerTestUtils.chunkIntoBatches({
+		items: [1, 2, 3, 4, 5],
+		batchSize: 2,
+	})
+	expect(batches).toEqual([[1, 2], [3, 4], [5]])
+})
+
 test('buildUniqueVectorIdBatches dedupes and chunks vector ids', () => {
 	const batches = workshopIndexerTestUtils.buildUniqueVectorIdBatches({
 		vectorIds: [' alpha ', 'beta', '', 'beta', 'gamma', 'delta'],

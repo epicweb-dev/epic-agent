@@ -54,6 +54,8 @@ const defaultSearchPageSize = 100
 const maxStoredSectionChars = 20_000
 const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
+const defaultEmbeddingBatchSize = 64
+const defaultVectorUpsertBatchSize = 200
 const vectorDeleteBatchSize = 500
 
 const textFileExtensions = new Set([
@@ -184,6 +186,21 @@ function splitIntoChunks({
 	return chunks
 }
 
+function chunkIntoBatches<T>({
+	items,
+	batchSize,
+}: {
+	items: Array<T>
+	batchSize: number
+}) {
+	const size = Math.max(1, batchSize)
+	const batches: Array<Array<T>> = []
+	for (let index = 0; index < items.length; index += size) {
+		batches.push(items.slice(index, index + size))
+	}
+	return batches
+}
+
 function buildUniqueVectorIdBatches({
 	vectorIds,
 	batchSize = vectorDeleteBatchSize,
@@ -194,12 +211,7 @@ function buildUniqueVectorIdBatches({
 	const uniqueVectorIds = Array.from(
 		new Set(vectorIds.map((vectorId) => vectorId.trim()).filter(Boolean)),
 	)
-	const size = Math.max(1, batchSize)
-	const batches: Array<Array<string>> = []
-	for (let index = 0; index < uniqueVectorIds.length; index += size) {
-		batches.push(uniqueVectorIds.slice(index, index + size))
-	}
-	return batches
+	return chunkIntoBatches({ items: uniqueVectorIds, batchSize })
 }
 
 function collectVectorIds(
@@ -275,34 +287,41 @@ async function embedChunksIfConfigured({
 		return sectionChunks
 	}
 
-	const texts = sectionChunks.map((chunk) => chunk.content)
-	const embeddingResponse = (await ai.run('@cf/baai/bge-base-en-v1.5', {
-		text: texts,
-	})) as unknown
+	const vectors: Array<Array<number>> = []
+	for (const chunkBatch of chunkIntoBatches({
+		items: sectionChunks,
+		batchSize: defaultEmbeddingBatchSize,
+	})) {
+		const embeddingResponse = (await ai.run('@cf/baai/bge-base-en-v1.5', {
+			text: chunkBatch.map((chunk) => chunk.content),
+		})) as unknown
 
-	let vectors: Array<Array<number>> = []
-	if (
-		embeddingResponse &&
-		typeof embeddingResponse === 'object' &&
-		'data' in embeddingResponse &&
-		Array.isArray((embeddingResponse as { data?: unknown }).data)
-	) {
-		vectors = (embeddingResponse as { data: Array<Array<number>> }).data
-	} else if (Array.isArray(embeddingResponse)) {
-		vectors = embeddingResponse as Array<Array<number>>
-	}
+		let batchVectors: Array<Array<number>> = []
+		if (
+			embeddingResponse &&
+			typeof embeddingResponse === 'object' &&
+			'data' in embeddingResponse &&
+			Array.isArray((embeddingResponse as { data?: unknown }).data)
+		) {
+			batchVectors = (embeddingResponse as { data: Array<Array<number>> }).data
+		} else if (Array.isArray(embeddingResponse)) {
+			batchVectors = embeddingResponse as Array<Array<number>>
+		}
 
-	if (vectors.length !== sectionChunks.length) {
-		console.warn(
-			'workshop-reindex-embedding-length-mismatch',
-			JSON.stringify({
-				runId,
-				workshopSlug,
-				expected: sectionChunks.length,
-				received: vectors.length,
-			}),
-		)
-		return sectionChunks
+		if (batchVectors.length !== chunkBatch.length) {
+			console.warn(
+				'workshop-reindex-embedding-length-mismatch',
+				JSON.stringify({
+					runId,
+					workshopSlug,
+					expected: chunkBatch.length,
+					received: batchVectors.length,
+				}),
+			)
+			return sectionChunks
+		}
+
+		vectors.push(...batchVectors)
 	}
 
 	const vectorIdsByIndex: Array<string | undefined> = []
@@ -331,7 +350,12 @@ async function embedChunksIfConfigured({
 	})
 
 	if (vectorPayloads.length > 0) {
-		await vectorIndex.upsert(vectorPayloads)
+		for (const vectorPayloadBatch of chunkIntoBatches({
+			items: vectorPayloads,
+			batchSize: defaultVectorUpsertBatchSize,
+		})) {
+			await vectorIndex.upsert(vectorPayloadBatch)
+		}
 	}
 
 	return sectionChunks.map((chunk, index) => ({
@@ -527,6 +551,7 @@ export const workshopIndexerTestUtils = {
 	parseStepFromPath,
 	groupStepFilesByDirectory,
 	splitIntoChunks,
+	chunkIntoBatches,
 	buildUniqueVectorIdBatches,
 	collectVectorIds,
 	deleteVectorIdsIfConfigured,
