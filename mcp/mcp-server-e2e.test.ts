@@ -294,6 +294,134 @@ async function seedIndexedWorkshopData(persistDir: string) {
 	])
 }
 
+async function seedSecondaryIndexedWorkshopData(persistDir: string) {
+	const runId = `run-${crypto.randomUUID()}`
+	const insertSql = `
+		INSERT INTO workshop_index_runs (
+			id,
+			status,
+			started_at,
+			completed_at,
+			workshop_count,
+			exercise_count,
+			step_count,
+			section_count
+		) VALUES (
+			'${escapeSql(runId)}',
+			'completed',
+			CURRENT_TIMESTAMP,
+			CURRENT_TIMESTAMP,
+			1,
+			1,
+			1,
+			2
+		);
+		INSERT INTO indexed_workshops (
+			workshop_slug,
+			title,
+			product,
+			repo_owner,
+			repo_name,
+			default_branch,
+			source_sha,
+			exercise_count,
+			has_diffs,
+			last_indexed_at,
+			index_run_id
+		) VALUES (
+			'advanced-typescript',
+			'Advanced TypeScript',
+			'Epic Web',
+			'epicweb-dev',
+			'advanced-typescript',
+			'main',
+			'seed-sha-2',
+			1,
+			0,
+			CURRENT_TIMESTAMP,
+			'${escapeSql(runId)}'
+		);
+		INSERT INTO indexed_exercises (
+			workshop_slug,
+			exercise_number,
+			title,
+			step_count
+		) VALUES (
+			'advanced-typescript',
+			1,
+			'Promises',
+			1
+		);
+		INSERT INTO indexed_steps (
+			workshop_slug,
+			exercise_number,
+			step_number,
+			problem_dir,
+			solution_dir,
+			has_diff
+		) VALUES (
+			'advanced-typescript',
+			1,
+			1,
+			'exercises/01.promises/01.problem.creation',
+			'exercises/01.promises/01.solution.creation',
+			0
+		);
+		INSERT INTO indexed_sections (
+			workshop_slug,
+			exercise_number,
+			step_number,
+			section_order,
+			section_kind,
+			label,
+			source_path,
+			content,
+			char_count,
+			is_diff,
+			index_run_id
+		) VALUES
+		(
+			'advanced-typescript',
+			1,
+			NULL,
+			10,
+			'exercise-instructions',
+			'Exercise 1 instructions',
+			'exercises/01.promises/README.mdx',
+			'Promises exercise context.',
+			26,
+			0,
+			'${escapeSql(runId)}'
+		),
+		(
+			'advanced-typescript',
+			1,
+			1,
+			20,
+			'problem-instructions',
+			'Problem instructions',
+			'exercises/01.promises/01.problem.creation/README.mdx',
+			'Promise creation problem context.',
+			33,
+			0,
+			'${escapeSql(runId)}'
+		);
+	`
+
+	await runWrangler([
+		'd1',
+		'execute',
+		'APP_DB',
+		'--local',
+		'--env',
+		'test',
+		'--persist-to',
+		persistDir,
+		'--command',
+		insertSql,
+	])
+}
+
 async function applyMigrations(persistDir: string) {
 	const migrationFiles = await listMigrationFiles()
 	if (migrationFiles.length === 0) {
@@ -766,6 +894,93 @@ test(
 			)?.text ?? ''
 		expect(diffOutput).toContain('"diffSections"')
 		expect(diffOutput).toContain('diff --git a/src/index.ts b/src/index.ts')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'mcp retrieval tools support pagination filters and random mode',
+	async () => {
+		await using database = await createTestDatabase()
+		await seedIndexedWorkshopData(database.persistDir)
+		await seedSecondaryIndexedWorkshopData(database.persistDir)
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const firstPageResult = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				limit: 1,
+			},
+		})
+		const firstPageOutput =
+			(firstPageResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		const parsedFirstPage = JSON.parse(firstPageOutput) as {
+			workshops: Array<{ workshop: string }>
+			nextCursor?: string
+		}
+		expect(parsedFirstPage.workshops.length).toBe(1)
+		expect(typeof parsedFirstPage.nextCursor).toBe('string')
+
+		const secondPageResult = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				limit: 1,
+				cursor: parsedFirstPage.nextCursor,
+			},
+		})
+		const secondPageOutput =
+			(secondPageResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		const parsedSecondPage = JSON.parse(secondPageOutput) as {
+			workshops: Array<{ workshop: string }>
+		}
+		expect(parsedSecondPage.workshops.length).toBe(1)
+		expect(parsedSecondPage.workshops[0]?.workshop).not.toBe(
+			parsedFirstPage.workshops[0]?.workshop,
+		)
+
+		const noDiffResult = await mcpClient.client.callTool({
+			name: 'list_workshops',
+			arguments: {
+				hasDiffs: false,
+			},
+		})
+		const noDiffOutput =
+			(noDiffResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		expect(noDiffOutput).toContain('advanced-typescript')
+		expect(noDiffOutput).not.toContain('mcp-fundamentals')
+
+		const randomResult = await mcpClient.client.callTool({
+			name: 'retrieve_learning_context',
+			arguments: {
+				random: true,
+				maxChars: 300,
+			},
+		})
+		const randomOutput =
+			(randomResult as CallToolResult).content.find(
+				(item): item is Extract<ContentBlock, { type: 'text' }> =>
+					item.type === 'text',
+			)?.text ?? ''
+		const parsedRandomOutput = JSON.parse(randomOutput) as {
+			workshop: string
+			exerciseNumber: number
+			sections: Array<{ label: string }>
+		}
+		expect(['advanced-typescript', 'mcp-fundamentals']).toContain(
+			parsedRandomOutput.workshop,
+		)
+		expect(parsedRandomOutput.exerciseNumber).toBe(1)
+		expect(parsedRandomOutput.sections.length).toBeGreaterThan(0)
 	},
 	{ timeout: defaultTimeoutMs },
 )

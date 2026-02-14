@@ -76,7 +76,8 @@ export async function handleWorkshopIndexRequest(
 		)
 	}
 
-	const runWorkshopReindexFn = options.runWorkshopReindexFn ?? runWorkshopReindex
+	const runWorkshopReindexFn =
+		options.runWorkshopReindexFn ?? runWorkshopReindex
 
 	try {
 		const summary = await runWorkshopReindexFn({
