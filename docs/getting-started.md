@@ -113,6 +113,13 @@ To preview changes without writing, add `--dry-run`. To emit a JSON summary, add
 
 See `docs/agents/setup.md` for local dev commands and verification steps.
 
+Quick verification commands:
+
+```
+bun run test:mcp:unit
+bun run validate
+```
+
 ## Build and deploy
 
 Build the project:
