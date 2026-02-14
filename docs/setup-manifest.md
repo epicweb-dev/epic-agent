@@ -13,6 +13,12 @@ Create or provide the following resources (prod + preview):
   - `binding`: `OAUTH_KV`
   - title (prod): `<app-name>-oauth`
   - title (preview): `<app-name>-oauth-preview`
+- (Optional for workshop semantic indexing) Vectorize index
+  - `binding`: `WORKSHOP_VECTOR_INDEX`
+  - used for chunk embedding upserts during manual workshop indexing
+- (Optional for workshop semantic indexing) Workers AI binding
+  - `binding`: `AI`
+  - used to generate embeddings when Vectorize indexing is enabled
 
 The post-download script will write the resulting IDs into `wrangler.jsonc`.
 
