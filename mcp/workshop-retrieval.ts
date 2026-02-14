@@ -482,6 +482,10 @@ export async function searchTopicContext({
 	stepNumber?: number
 }) {
 	const startedAt = Date.now()
+	const normalizedQuery = query.trim()
+	if (normalizedQuery.length < 3) {
+		throw new Error('query must be at least 3 characters for topic search.')
+	}
 	if (typeof stepNumber === 'number' && typeof exerciseNumber !== 'number') {
 		throw new Error(
 			'exerciseNumber is required when stepNumber is provided for topic search.',
@@ -549,7 +553,7 @@ export async function searchTopicContext({
 	}
 
 	const topK = Math.min(Math.max(limit ?? defaultVectorSearchLimit, 1), 20)
-	const embedding = await embedSearchQuery({ ai, query })
+	const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
 	const filter: Record<string, string | number> = {}
 	if (workshop) filter.workshop_slug = workshop
 	if (typeof exerciseNumber === 'number')
@@ -607,7 +611,7 @@ export async function searchTopicContext({
 	console.info(
 		'mcp-search-topic-context',
 		JSON.stringify({
-			queryLength: query.length,
+			queryLength: normalizedQuery.length,
 			topK,
 			returned: results.length,
 			filter,
@@ -616,7 +620,7 @@ export async function searchTopicContext({
 	)
 
 	return {
-		query,
+		query: normalizedQuery,
 		limit: topK,
 		matches: results,
 	}

@@ -66,6 +66,7 @@ Requirements:
 
 - `WORKSHOP_VECTOR_INDEX` binding
 - `AI` binding for embeddings
+- `query` must be at least 3 non-whitespace characters
 
 Behavior:
 

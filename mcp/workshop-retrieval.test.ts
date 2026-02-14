@@ -166,6 +166,44 @@ test('searchTopicContext requires exerciseNumber when stepNumber is provided', a
 	)
 })
 
+test('searchTopicContext rejects too-short queries before embedding', async () => {
+	let embeddingCalls = 0
+	const ai = {
+		async run() {
+			embeddingCalls += 1
+			return {
+				data: [[0.12, 0.34, 0.56]],
+			}
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query() {
+			return {
+				matches: [],
+				count: 0,
+			}
+		},
+	} as unknown as Vectorize
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	await expect(
+		searchTopicContext({
+			env,
+			query: '  a ',
+			workshop: 'mcp-fundamentals',
+		}),
+	).rejects.toThrow('query must be at least 3 characters for topic search.')
+	expect(embeddingCalls).toBe(0)
+})
+
 test('searchTopicContext returns ranked matches from vector ids', async () => {
 	let observedTopK = 0
 	let observedFilter: unknown = null
