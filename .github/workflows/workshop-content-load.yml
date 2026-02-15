@@ -104,9 +104,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          BATCH_SIZE="$(printf '%s' "${WORKSHOP_BATCH_SIZE:-5}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-          if ! printf '%s' "$BATCH_SIZE" | grep -Eq '^[0-9]+$'; then
-            echo "batchSize must be a number between 1 and 20." >&2
+          BATCH_SIZE_RAW="$(printf '%s' "${WORKSHOP_BATCH_SIZE:-5}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          if [ -z "$BATCH_SIZE_RAW" ]; then
+            BATCH_SIZE_RAW="5"
+          fi
+
+          BATCH_SIZE="$(jq -nr --arg value "$BATCH_SIZE_RAW" 'try ($value | tonumber) catch empty')"
+          if [ -z "$BATCH_SIZE" ] || ! printf '%s' "$BATCH_SIZE" | grep -Eq '^[0-9]+$'; then
+            echo "batchSize must be an integer between 1 and 20." >&2
             exit 1
           fi
           if [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 20 ]; then
