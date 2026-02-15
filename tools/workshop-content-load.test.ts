@@ -11,23 +11,33 @@ test('RemoteD1Database.batch sends { queries: [...] } payload to D1', async () =
 	const calls: Array<FetchCall> = []
 	const originalFetch = globalThis.fetch
 
-	globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-		const url = typeof input === 'string' ? input : input.toString()
-		calls.push({ url, init })
-		return new Response(
-			JSON.stringify({
-				success: true,
-				result: [
-					{ success: true, results: [], meta: {} },
-					{ success: true, results: [], meta: {} },
-				],
-			}),
-			{
-				status: 200,
-				headers: { 'Content-Type': 'application/json' },
-			},
-		)
-	}
+	const fetchMock = Object.assign(
+		async (input: unknown, init?: RequestInit) => {
+			const url =
+				typeof input === 'string'
+					? input
+					: input instanceof URL
+						? input.toString()
+						: String(input)
+			calls.push({ url, init })
+			return new Response(
+				JSON.stringify({
+					success: true,
+					result: [
+						{ success: true, results: [], meta: {} },
+						{ success: true, results: [], meta: {} },
+					],
+				}),
+				{
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			)
+		},
+		{ preconnect() {} },
+	) as unknown as typeof fetch
+
+	globalThis.fetch = fetchMock
 
 	try {
 		const db = new RemoteD1Database({
@@ -63,10 +73,15 @@ test('RemoteD1Database.batch sends { queries: [...] } payload to D1', async () =
 test('RemoteD1Database.batch returns empty array for empty input', async () => {
 	let called = false
 	const originalFetch = globalThis.fetch
-	globalThis.fetch = async () => {
-		called = true
-		return new Response('unexpected')
-	}
+	const fetchMock = Object.assign(
+		async () => {
+			called = true
+			return new Response('unexpected')
+		},
+		{ preconnect() {} },
+	) as unknown as typeof fetch
+
+	globalThis.fetch = fetchMock
 
 	try {
 		const db = new RemoteD1Database({
