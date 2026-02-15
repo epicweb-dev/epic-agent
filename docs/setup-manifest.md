@@ -84,6 +84,8 @@ To load workshop content into D1 + Vectorize from CI, run the
 - workshop slugs are trimmed, lowercased, and deduplicated before sending the
   reindex payload
 - workshop filters are capped at 100 unique slugs after normalization
+- normalized reindex payloads must remain within the route body-size limit
+  (50,000 characters)
 - if the provided workshop list collapses to empty after trimming/deduping, the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, reindex fails fast with an explicit

@@ -93,6 +93,11 @@ jobs:
           else
             PAYLOAD='{}'
           fi
+          PAYLOAD_SIZE=${#PAYLOAD}
+          if [ "$PAYLOAD_SIZE" -gt 50000 ]; then
+            echo "Normalized reindex payload exceeds the 50000-character route limit." >&2
+            exit 1
+          fi
 
           RESPONSE_FILE=$(mktemp)
           HTTP_STATUS=$(

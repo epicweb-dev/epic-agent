@@ -106,8 +106,9 @@ unknown, the request fails with an explicit error. The route also rejects
 malformed JSON payloads with `400` instead of silently defaulting to full
 reindex behavior. The route also enforces a maximum request body size (50,000
 characters) and returns `413` when exceeded. The `🧠 Load Workshop Content`
-workflow mirrors these guardrails by lowercasing/normalizing filters and failing
-fast if more than 100 unique workshop slugs are provided.
+workflow mirrors these guardrails by lowercasing/normalizing filters, failing
+fast if more than 100 unique workshop slugs are provided, and pre-checking the
+serialized payload size before it calls the route.
 
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an
