@@ -769,8 +769,11 @@ function filterRequestedRepositories({
 		(workshop) => !availableRepositoryNames.has(workshop),
 	)
 	if (missingSelections.length > 0) {
+		const orderedMissingSelections = [...missingSelections].sort((a, b) =>
+			a.localeCompare(b),
+		)
 		throw new Error(
-			`Unknown workshop filter(s): ${missingSelections.join(', ')}.`,
+			`Unknown workshop filter(s): ${orderedMissingSelections.join(', ')}.`,
 		)
 	}
 

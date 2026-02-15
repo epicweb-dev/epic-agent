@@ -177,6 +177,22 @@ test('filterRequestedRepositories reports unknown workshops in normalized lowerc
 	).toThrow('Unknown workshop filter(s): missing-workshop.')
 })
 
+test('filterRequestedRepositories reports missing workshops in sorted order', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+	]
+	expect(() =>
+		workshopIndexerTestUtils.filterRequestedRepositories({
+			repositories,
+			onlyWorkshops: ['z-workshop', 'a-workshop'],
+		}),
+	).toThrow('Unknown workshop filter(s): a-workshop, z-workshop.')
+})
+
 test('splitIntoChunks is deterministic with overlap', () => {
 	const longContent = Array.from(
 		{ length: 220 },
