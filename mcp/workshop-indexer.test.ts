@@ -311,3 +311,24 @@ test('shouldRetryGitHubFetchError retries until max attempts', () => {
 		}),
 	).toBe(false)
 })
+
+test('resolveRetryDelayMs prefers retry-after header and falls back to backoff', () => {
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			attempt: 2,
+			retryAfterHeader: '7',
+		}),
+	).toBe(7_000)
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			attempt: 3,
+			retryAfterHeader: 'invalid',
+		}),
+	).toBe(2_000)
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			attempt: 2,
+			baseDelayMs: 200,
+		}),
+	).toBe(400)
+})

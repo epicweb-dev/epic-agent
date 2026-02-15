@@ -584,6 +584,25 @@ function shouldRetryGitHubFetchError({
 	return attempt < maxAttempts
 }
 
+function resolveRetryDelayMs({
+	attempt,
+	retryAfterHeader,
+	baseDelayMs = githubRetryBaseDelayMs,
+}: {
+	attempt: number
+	retryAfterHeader?: string | null
+	baseDelayMs?: number
+}) {
+	const parsedRetryAfterSeconds = Number.parseInt(
+		(retryAfterHeader ?? '').trim(),
+		10,
+	)
+	if (Number.isFinite(parsedRetryAfterSeconds) && parsedRetryAfterSeconds > 0) {
+		return parsedRetryAfterSeconds * 1_000
+	}
+	return baseDelayMs * 2 ** Math.max(0, attempt - 1)
+}
+
 export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
@@ -598,6 +617,7 @@ export const workshopIndexerTestUtils = {
 	formatGitHubApiError,
 	shouldRetryGitHubRequest,
 	shouldRetryGitHubFetchError,
+	resolveRetryDelayMs,
 }
 
 async function githubJson<T>({
@@ -632,7 +652,7 @@ async function githubJson<T>({
 					maxAttempts: githubRequestMaxAttempts,
 				})
 			) {
-				const retryDelayMs = githubRetryBaseDelayMs * 2 ** (attempt - 1)
+				const retryDelayMs = resolveRetryDelayMs({ attempt })
 				const message = error instanceof Error ? error.message : String(error)
 				console.warn(
 					'workshop-reindex-github-request-retry',
@@ -662,7 +682,10 @@ async function githubJson<T>({
 				maxAttempts: githubRequestMaxAttempts,
 			})
 		) {
-			const retryDelayMs = githubRetryBaseDelayMs * 2 ** (attempt - 1)
+			const retryDelayMs = resolveRetryDelayMs({
+				attempt,
+				retryAfterHeader: response.headers.get('retry-after'),
+			})
 			console.warn(
 				'workshop-reindex-github-request-retry',
 				JSON.stringify({
