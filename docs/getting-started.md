@@ -75,8 +75,19 @@ bun ./docs/post-download.ts --guided
   URLs and for reliable token-based Wrangler CI commands)
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
 - `APP_BASE_URL` (production app URL)
-- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected workshop reindex calls)
-- `GITHUB_TOKEN` (optional but recommended for higher indexing throughput)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (optional; only required if you plan to call the
+  protected reindex endpoint on the deployed Worker)
+- `GITHUB_TOKEN` (optional but recommended for higher indexing throughput and/or
+  indexing private workshop repos; defaults to the GitHub Actions token when
+  absent)
+- `WORKSHOP_VECTORIZE_INDEX_NAME` (optional; override Vectorize index name for
+  CI indexing in production; otherwise defaults to
+  `<wrangler.jsonc name>-workshop-vector-index`)
+- `WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW` (optional; override Vectorize index
+  name for CI indexing in preview; otherwise defaults to
+  `<wrangler.jsonc name>-workshop-vector-index-preview`)
+- `WORKSHOP_VECTORIZE_DISABLED` (optional; set to `true`/`1`/`yes` to skip
+  Vectorize + Workers AI calls during CI indexing)
 
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 
@@ -94,14 +105,14 @@ bun run deploy
 ## Load workshop content in GitHub Actions
 
 After deploy, run the `🧠 Load Workshop Content` workflow from the Actions tab
-to populate D1 and Vectorize via the protected reindex endpoint.
+to populate D1 (and Vectorize when enabled) directly from the workflow job.
 
 - choose the target environment (`production` or `preview`)
 - choose a batch size (workshops processed per request, default 5)
 - optionally provide comma/newline-separated workshop slugs to scope the index
   run
 - provided workshop slugs are trimmed, lowercased, and deduplicated before
-  reindex starts
+  indexing starts
 - leave workshop input empty to index all workshop repositories
 
 ## Agent/CI setup

@@ -209,6 +209,13 @@ test('replaceWorkshopIndex does not issue SQL transaction statements', async () 
 	const executedSql: Array<string> = []
 	const execCalls: Array<string> = []
 	const db = {
+		async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+			const results: Array<unknown> = []
+			for (const statement of statements) {
+				results.push(await statement.run())
+			}
+			return results as Array<D1Result>
+		},
 		exec(sql: string) {
 			execCalls.push(sql)
 			return Promise.resolve()
@@ -248,6 +255,13 @@ test('replaceWorkshopIndex does not issue SQL transaction statements', async () 
 test('replaceWorkshopIndex clears workshop scope after partial write failures', async () => {
 	const executedSql: Array<string> = []
 	const db = {
+		async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+			const results: Array<unknown> = []
+			for (const statement of statements) {
+				results.push(await statement.run())
+			}
+			return results as Array<D1Result>
+		},
 		prepare(sql: string) {
 			return {
 				bind(..._params: Array<unknown>) {
@@ -291,6 +305,13 @@ test('replaceWorkshopIndex clears workshop scope after partial write failures', 
 test('replaceWorkshopIndex preserves original write error when cleanup also fails', async () => {
 	let deleteStatementCount = 0
 	const db = {
+		async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+			const results: Array<unknown> = []
+			for (const statement of statements) {
+				results.push(await statement.run())
+			}
+			return results as Array<D1Result>
+		},
 		prepare(sql: string) {
 			return {
 				bind(..._params: Array<unknown>) {
@@ -351,6 +372,13 @@ test('replaceWorkshopIndex re-clears workshop scope when initial clear fails', a
 	let deleteStatementCount = 0
 	let insertAttempted = false
 	const db = {
+		async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+			const results: Array<unknown> = []
+			for (const statement of statements) {
+				results.push(await statement.run())
+			}
+			return results as Array<D1Result>
+		},
 		prepare(sql: string) {
 			return {
 				bind(..._params: Array<unknown>) {
