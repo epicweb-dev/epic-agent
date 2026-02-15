@@ -256,6 +256,8 @@ jobs:
             BASE_PAYLOAD='{}'
           fi
 
+          WORKSHOPS_PARAM=$(printf '%s' "$BASE_PAYLOAD" | jq -r '.workshops // [] | join(",")')
+
           TOTAL_WORKSHOP_COUNT=0
           TOTAL_EXERCISE_COUNT=0
           TOTAL_STEP_COUNT=0
@@ -272,18 +274,6 @@ jobs:
               exit 1
             fi
 
-            PAYLOAD=$(
-              printf '%s' "$BASE_PAYLOAD" | jq -c \
-                --arg cursor "$NEXT_CURSOR" \
-                --argjson batchSize "$BATCH_SIZE" \
-                '. + { batchSize: $batchSize } + (if (($cursor | length) > 0) then { cursor: $cursor } else {} end)'
-            )
-            PAYLOAD_SIZE=${#PAYLOAD}
-            if [ "$PAYLOAD_SIZE" -gt 50000 ]; then
-              echo "Normalized reindex payload exceeds the 50000-character route limit." >&2
-              exit 1
-            fi
-
             RESPONSE_FILE=$(mktemp)
             HTTP_STATUS=$(
               curl --silent --show-error \
@@ -297,8 +287,10 @@ jobs:
                 --request POST \
                 --url "$TARGET_URL/internal/workshop-index/reindex" \
                 --header "Authorization: Bearer $WORKSHOP_INDEX_ADMIN_TOKEN" \
-                --header 'Content-Type: application/json' \
-                --data "$PAYLOAD"
+                --header 'Content-Type: application/x-www-form-urlencoded' \
+                --data-urlencode "batchSize=$BATCH_SIZE" \
+                --data-urlencode "cursor=$NEXT_CURSOR" \
+                --data-urlencode "workshops=$WORKSHOPS_PARAM"
             )
 
             RESPONSE_BODY=$(<"$RESPONSE_FILE")
