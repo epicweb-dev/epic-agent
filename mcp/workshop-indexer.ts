@@ -585,6 +585,16 @@ function shouldRetryGitHubFetchError({
 	return attempt < maxAttempts
 }
 
+function formatGitHubFetchError({
+	pathname,
+	errorMessage,
+}: {
+	pathname: string
+	errorMessage: string
+}) {
+	return `GitHub API request failed for ${pathname}: ${errorMessage}`
+}
+
 function resolveRetryDelayMs({
 	attempt,
 	retryAfterHeader,
@@ -630,6 +640,7 @@ export const workshopIndexerTestUtils = {
 	formatGitHubApiError,
 	shouldRetryGitHubRequest,
 	shouldRetryGitHubFetchError,
+	formatGitHubFetchError,
 	resolveRetryDelayMs,
 }
 
@@ -659,6 +670,7 @@ async function githubJson<T>({
 				},
 			})
 		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
 			if (
 				shouldRetryGitHubFetchError({
 					attempt,
@@ -666,7 +678,6 @@ async function githubJson<T>({
 				})
 			) {
 				const retryDelayMs = resolveRetryDelayMs({ attempt })
-				const message = error instanceof Error ? error.message : String(error)
 				console.warn(
 					'workshop-reindex-github-request-retry',
 					JSON.stringify({
@@ -680,7 +691,12 @@ async function githubJson<T>({
 				await wait(retryDelayMs)
 				continue
 			}
-			throw error
+			throw new Error(
+				formatGitHubFetchError({
+					pathname: url.pathname,
+					errorMessage: message,
+				}),
+			)
 		}
 		if (response.ok) {
 			return (await response.json()) as T

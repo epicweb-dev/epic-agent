@@ -312,6 +312,17 @@ test('shouldRetryGitHubFetchError retries until max attempts', () => {
 	).toBe(false)
 })
 
+test('formatGitHubFetchError includes path and error details', () => {
+	const message = workshopIndexerTestUtils.formatGitHubFetchError({
+		pathname: '/repos/epicweb-dev/mcp-fundamentals/git/trees/main',
+		errorMessage: 'network socket disconnected',
+	})
+	expect(message).toContain(
+		'GitHub API request failed for /repos/epicweb-dev/mcp-fundamentals/git/trees/main',
+	)
+	expect(message).toContain('network socket disconnected')
+})
+
 test('resolveRetryDelayMs prefers retry-after header and falls back to backoff', () => {
 	expect(
 		workshopIndexerTestUtils.resolveRetryDelayMs({
