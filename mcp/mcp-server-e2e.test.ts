@@ -27,6 +27,8 @@ const indexingTimeoutMs = 240_000
 const testWorkshopIndexAdminToken = 'test-workshop-index-token'
 const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
 const runtimeGitHubToken = resolveRuntimeGitHubToken()
+const runWorkshopNetworkReindexTest =
+	runWorkshopNetworkTests && Boolean(runtimeGitHubToken)
 
 const passwordHashPrefix = 'pbkdf2_sha256'
 const passwordSaltBytes = 16
@@ -1038,7 +1040,7 @@ test(
 	{ timeout: defaultTimeoutMs },
 )
 
-const networkTest = runWorkshopNetworkTests ? test : test.skip
+const networkTest = runWorkshopNetworkReindexTest ? test : test.skip
 
 networkTest(
 	'manual reindex endpoint indexes real workshop data for retrieval tools',
