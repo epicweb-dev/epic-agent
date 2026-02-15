@@ -1111,6 +1111,9 @@ test(
 
 		const textOutput = getTextResultContent(result as CallToolResult)
 		expect(textOutput).toContain('Input validation error')
+		expect(textOutput).toContain(
+			'query must be at least 3 characters for topic search.',
+		)
 		expect(textOutput).not.toContain('Vector search is unavailable')
 	},
 	{ timeout: defaultTimeoutMs },

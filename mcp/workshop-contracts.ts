@@ -39,7 +39,10 @@ export const retrieveDiffContextInputSchema = {
 }
 
 export const searchTopicContextInputSchema = {
-	query: z.string().trim().min(3),
+	query: z
+		.string()
+		.trim()
+		.min(3, 'query must be at least 3 characters for topic search.'),
 	limit: z.coerce.number().int().positive().max(20).optional(),
 	workshop: z.string().trim().min(1).optional(),
 	exerciseNumber: z.coerce.number().int().positive().optional(),
