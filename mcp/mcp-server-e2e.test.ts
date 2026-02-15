@@ -1010,7 +1010,7 @@ test(
 		})
 		const noMatchOutput = getTextResultContent(noMatchResult as CallToolResult)
 		expect(noMatchOutput).toContain(
-			'No diff context matched focus "no-such-file" for workshop "mcp-fundamentals" exercise 1.',
+			'No diff context matched focus "no-such-file" for workshop "mcp-fundamentals" exercise 1 step 1.',
 		)
 	},
 	{ timeout: defaultTimeoutMs },

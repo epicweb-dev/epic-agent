@@ -60,7 +60,8 @@ Supports:
 - same payload controls as learning context (`maxChars`, `cursor`)
 
 If a non-empty `focus` value yields no diff matches, the tool returns a
-focus-specific error so callers can quickly adjust their query.
+focus-specific error so callers can quickly adjust their query. Errors include
+the requested scope (workshop/exercise and step when provided).
 
 ## `search_topic_context`
 

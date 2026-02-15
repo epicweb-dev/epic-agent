@@ -358,15 +358,17 @@ export async function retrieveDiffContext({
 		normalizedFocus.length > 0
 			? filterByFocus(diffSections, normalizedFocus)
 			: diffSections
+	const scopeLabel =
+		typeof stepNumber === 'number'
+			? `workshop "${workshop}" exercise ${exerciseNumber} step ${stepNumber}`
+			: `workshop "${workshop}" exercise ${exerciseNumber}`
 	if (focusedSections.length === 0) {
 		if (normalizedFocus.length > 0) {
 			throw new Error(
-				`No diff context matched focus "${normalizedFocus}" for workshop "${workshop}" exercise ${exerciseNumber}.`,
+				`No diff context matched focus "${normalizedFocus}" for ${scopeLabel}.`,
 			)
 		}
-		throw new Error(
-			`No diff context found for workshop "${workshop}" exercise ${exerciseNumber}.`,
-		)
+		throw new Error(`No diff context found for ${scopeLabel}.`)
 	}
 
 	const truncatedResult = truncateSections({
