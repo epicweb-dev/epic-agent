@@ -44,7 +44,9 @@ function parseBatchSizeFromString(value: string) {
 	return floored === parsed ? floored : parsed
 }
 
-function tryParseJsonBody(value: string): { ok: true; body: unknown } | { ok: false } {
+function tryParseJsonBody(
+	value: string,
+): { ok: true; body: unknown } | { ok: false } {
 	try {
 		const parsed = JSON.parse(value) as unknown
 		if (typeof parsed === 'string' && looksLikeJson(parsed)) {
@@ -60,7 +62,9 @@ function tryParseJsonBody(value: string): { ok: true; body: unknown } | { ok: fa
 	}
 }
 
-function tryParseFormBody(value: string): { ok: true; body: unknown } | { ok: false } {
+function tryParseFormBody(
+	value: string,
+): { ok: true; body: unknown } | { ok: false } {
 	// Basic heuristic: only treat input as form-encoded if it contains obvious
 	// separators. This avoids mis-parsing arbitrary text.
 	if (!value.includes('=') && !value.includes('&')) return { ok: false }
