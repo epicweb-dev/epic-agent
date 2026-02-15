@@ -102,14 +102,14 @@ array or as a comma/newline-delimited string; values are trimmed, lowercased,
 and deduplicated server-side. Empty lists fall back to full discovery-based
 reindex. For operational safety, the route accepts at most 100 workshop filters
 after normalization (trim/lowercase/dedupe). If any requested workshop slug is
-unknown, the request fails with an explicit error. The route also rejects
-malformed JSON payloads with `400` instead of silently defaulting to full
-reindex behavior. The route also enforces a maximum request body size (50,000
-characters), including an early `Content-Length` guard when present, and returns
-`413` when exceeded. The `🧠 Load Workshop Content` workflow mirrors these
-guardrails by lowercasing/normalizing filters, failing fast if more than 100
-unique workshop slugs are provided, and pre-checking the serialized payload size
-before it calls the route.
+unknown, the request fails with a `400` invalid-payload response and explicit
+details. The route also rejects malformed JSON payloads with `400` instead of
+silently defaulting to full reindex behavior. The route also enforces a maximum
+request body size (50,000 characters), including an early `Content-Length` guard
+when present, and returns `413` when exceeded. The `🧠 Load Workshop Content`
+workflow mirrors these guardrails by lowercasing/normalizing filters, failing
+fast if more than 100 unique workshop slugs are provided, and pre-checking the
+serialized payload size before it calls the route.
 
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an

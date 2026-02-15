@@ -49,6 +49,13 @@ type WorkshopIndexEnv = Env & {
 	AI?: Ai
 }
 
+export class WorkshopIndexInputError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = 'WorkshopIndexInputError'
+	}
+}
+
 const workshopOrg = 'epicweb-dev'
 const defaultSearchPageSize = 100
 const maxStoredSectionChars = 20_000
@@ -772,7 +779,7 @@ function filterRequestedRepositories({
 		const orderedMissingSelections = [...missingSelections].sort((a, b) =>
 			a.localeCompare(b),
 		)
-		throw new Error(
+		throw new WorkshopIndexInputError(
 			`Unknown workshop filter(s): ${orderedMissingSelections.join(', ')}.`,
 		)
 	}

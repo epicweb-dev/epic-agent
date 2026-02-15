@@ -1,6 +1,9 @@
 /// <reference types="bun" />
 import { expect, test } from 'bun:test'
-import { workshopIndexerTestUtils } from './workshop-indexer.ts'
+import {
+	WorkshopIndexInputError,
+	workshopIndexerTestUtils,
+} from './workshop-indexer.ts'
 
 test('parseExerciseFromPath supports workshop exercise paths', () => {
 	const parsed = workshopIndexerTestUtils.parseExerciseFromPath(
@@ -191,6 +194,29 @@ test('filterRequestedRepositories reports missing workshops in sorted order', ()
 			onlyWorkshops: ['z-workshop', 'a-workshop'],
 		}),
 	).toThrow('Unknown workshop filter(s): a-workshop, z-workshop.')
+})
+
+test('filterRequestedRepositories throws WorkshopIndexInputError for invalid selections', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+	]
+	let thrownError: unknown
+	try {
+		workshopIndexerTestUtils.filterRequestedRepositories({
+			repositories,
+			onlyWorkshops: ['missing-workshop'],
+		})
+	} catch (error) {
+		thrownError = error
+	}
+	expect(thrownError).toBeInstanceOf(WorkshopIndexInputError)
+	expect((thrownError as Error).message).toBe(
+		'Unknown workshop filter(s): missing-workshop.',
+	)
 })
 
 test('splitIntoChunks is deterministic with overlap', () => {

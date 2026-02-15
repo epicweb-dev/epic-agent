@@ -1,5 +1,6 @@
 /// <reference types="bun" />
 import { expect, test } from 'bun:test'
+import { WorkshopIndexInputError } from '../mcp/workshop-indexer.ts'
 import {
 	handleWorkshopIndexRequest,
 	workshopFilterMaxCount,
@@ -536,6 +537,33 @@ test('workshop index route rejects null workshop filters', async () => {
 		ok: false,
 		error: 'Invalid reindex payload.',
 		details: ['Invalid input: expected array, received null'],
+	})
+})
+
+test('workshop index route returns 400 for reindex input errors', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+			},
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				throw new WorkshopIndexInputError(
+					'Unknown workshop filter(s): not-a-workshop.',
+				)
+			},
+		},
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: ['Unknown workshop filter(s): not-a-workshop.'],
 	})
 })
 

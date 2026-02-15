@@ -89,7 +89,7 @@ To load workshop content into D1 + Vectorize from CI, run the
 - if the provided workshop list collapses to empty after trimming/deduping, the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, reindex fails fast with an explicit
-  error naming missing workshops
+  `400` response naming missing workshops
 - target URLs must be absolute `http://` or `https://` base URLs
 - the workflow retries transient network failures when calling the protected
   reindex endpoint

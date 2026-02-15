@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
+import {
+	WorkshopIndexInputError,
+	runWorkshopReindex,
+} from '../mcp/workshop-indexer.ts'
 import {
 	workshopFilterMaxCount,
 	workshopIndexRequestBodyMaxChars,
@@ -166,6 +169,9 @@ export async function handleWorkshopIndexRequest(
 		})
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
+		if (error instanceof WorkshopIndexInputError) {
+			return invalidReindexPayloadResponse([message])
+		}
 		console.error(
 			'workshop-index-route-reindex-failed',
 			JSON.stringify({
