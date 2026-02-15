@@ -1042,6 +1042,39 @@ test(
 	{ timeout: defaultTimeoutMs },
 )
 
+test(
+	'manual reindex endpoint rejects malformed json payloads',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: '{"workshops":["mcp-fundamentals"]',
+			},
+		)
+
+		expect(response.status).toBe(400)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+			details?: Array<string>
+		}
+		expect(payload).toEqual({
+			ok: false,
+			error: 'Invalid reindex payload.',
+			details: ['Request body must be valid JSON.'],
+		})
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
 const networkTest = runWorkshopNetworkReindexTest ? test : test.skip
 
 networkTest(
