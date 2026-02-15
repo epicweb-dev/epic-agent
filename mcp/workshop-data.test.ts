@@ -346,3 +346,40 @@ test('replaceWorkshopIndex preserves original write error when cleanup also fail
 		),
 	).toBe(true)
 })
+
+test('replaceWorkshopIndex re-clears workshop scope when initial clear fails', async () => {
+	let deleteStatementCount = 0
+	let insertAttempted = false
+	const db = {
+		prepare(sql: string) {
+			return {
+				bind(..._params: Array<unknown>) {
+					return {
+						async run() {
+							if (sql.includes('DELETE FROM indexed_')) {
+								deleteStatementCount += 1
+								if (deleteStatementCount === 3) {
+									throw new Error('initial clear failed')
+								}
+								return {}
+							}
+							insertAttempted = true
+							return {}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+
+	const fixture = createReplaceWorkshopIndexFixture()
+	await expect(
+		replaceWorkshopIndex({
+			db,
+			...fixture,
+		}),
+	).rejects.toThrow('initial clear failed')
+
+	expect(deleteStatementCount).toBe(8)
+	expect(insertAttempted).toBe(false)
+})

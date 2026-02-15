@@ -393,12 +393,12 @@ export async function replaceWorkshopIndex({
 	sections: Array<IndexedSectionWrite>
 	sectionChunks: Array<IndexedSectionChunkWrite>
 }) {
-	await clearWorkshopIndexScope({
-		db,
-		workshopSlug: workshop.workshopSlug,
-	})
-
 	try {
+		await clearWorkshopIndexScope({
+			db,
+			workshopSlug: workshop.workshopSlug,
+		})
+
 		await db
 			.prepare(
 				`
