@@ -74,7 +74,12 @@ jobs:
 
           if [ -n "$WORKSHOP_LIST_INPUT" ]; then
             WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique')
-            PAYLOAD=$(jq -nc --argjson workshops "$WORKSHOPS_JSON" '{ workshops: $workshops }')
+            WORKSHOP_COUNT_INPUT=$(printf '%s' "$WORKSHOPS_JSON" | jq -r 'length')
+            if [ "$WORKSHOP_COUNT_INPUT" -gt 0 ]; then
+              PAYLOAD=$(jq -nc --argjson workshops "$WORKSHOPS_JSON" '{ workshops: $workshops }')
+            else
+              PAYLOAD='{}'
+            fi
           else
             PAYLOAD='{}'
           fi
@@ -119,12 +124,18 @@ jobs:
           STEP_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.stepCount // 0')
           SECTION_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionCount // 0')
           SECTION_CHUNK_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionChunkCount // 0')
+          REQUESTED_WORKSHOPS=$(printf '%s' "$PAYLOAD" | jq -r '.workshops // [] | join(", ")')
 
           {
             echo "## Workshop content load complete"
             echo ""
             echo "- Environment: $TARGET_ENVIRONMENT"
             echo "- Target URL: $TARGET_URL"
+            if [ -n "$REQUESTED_WORKSHOPS" ]; then
+              echo "- Requested workshops: $REQUESTED_WORKSHOPS"
+            else
+              echo "- Requested workshops: all discovered workshop repositories"
+            fi
             echo "- Workshop count: $WORKSHOP_COUNT"
             echo "- Exercise count: $EXERCISE_COUNT"
             echo "- Step count: $STEP_COUNT"

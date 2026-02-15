@@ -81,6 +81,8 @@ To load workshop content into D1 + Vectorize from CI, run the
 - optionally provide a comma-separated workshop list to limit indexing scope
 - leave the workshop list empty to index all discovered workshop repositories
 - workshop slugs are trimmed and deduplicated before sending the reindex payload
+- if the provided workshop list collapses to empty after trimming/deduping, the
+  workflow falls back to indexing all discovered workshop repositories
 - the workflow retries transient network failures when calling the protected
   reindex endpoint
 - the workflow expects a successful JSON response (`ok: true`) from the reindex
