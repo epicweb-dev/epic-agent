@@ -282,3 +282,24 @@ test('shouldRetryGitHubRequest stops at max attempts and non-retriable errors', 
 		}),
 	).toBe(false)
 })
+
+test('shouldRetryGitHubFetchError retries until max attempts', () => {
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubFetchError({
+			attempt: 1,
+			maxAttempts: 3,
+		}),
+	).toBe(true)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubFetchError({
+			attempt: 2,
+			maxAttempts: 3,
+		}),
+	).toBe(true)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubFetchError({
+			attempt: 3,
+			maxAttempts: 3,
+		}),
+	).toBe(false)
+})

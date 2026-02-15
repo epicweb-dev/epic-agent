@@ -574,6 +574,16 @@ function shouldRetryGitHubRequest({
 	return false
 }
 
+function shouldRetryGitHubFetchError({
+	attempt,
+	maxAttempts,
+}: {
+	attempt: number
+	maxAttempts: number
+}) {
+	return attempt < maxAttempts
+}
+
 export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
@@ -587,6 +597,7 @@ export const workshopIndexerTestUtils = {
 	shouldIgnoreDiffPath,
 	formatGitHubApiError,
 	shouldRetryGitHubRequest,
+	shouldRetryGitHubFetchError,
 }
 
 async function githubJson<T>({
@@ -604,14 +615,40 @@ async function githubJson<T>({
 	}
 	const token = env.GITHUB_TOKEN?.trim()
 	for (let attempt = 1; attempt <= githubRequestMaxAttempts; attempt += 1) {
-		const response = await fetch(url, {
-			headers: {
-				Accept: 'application/vnd.github+json',
-				'User-Agent': 'epic-agent-workshop-indexer',
-				'X-GitHub-Api-Version': '2022-11-28',
-				...(token ? { Authorization: `Bearer ${token}` } : {}),
-			},
-		})
+		let response: Response
+		try {
+			response = await fetch(url, {
+				headers: {
+					Accept: 'application/vnd.github+json',
+					'User-Agent': 'epic-agent-workshop-indexer',
+					'X-GitHub-Api-Version': '2022-11-28',
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+				},
+			})
+		} catch (error) {
+			if (
+				shouldRetryGitHubFetchError({
+					attempt,
+					maxAttempts: githubRequestMaxAttempts,
+				})
+			) {
+				const retryDelayMs = githubRetryBaseDelayMs * 2 ** (attempt - 1)
+				const message = error instanceof Error ? error.message : String(error)
+				console.warn(
+					'workshop-reindex-github-request-retry',
+					JSON.stringify({
+						pathname: url.pathname,
+						status: 'fetch-error',
+						attempt,
+						retryDelayMs,
+						error: message,
+					}),
+				)
+				await wait(retryDelayMs)
+				continue
+			}
+			throw error
+		}
 		if (response.ok) {
 			return (await response.json()) as T
 		}
