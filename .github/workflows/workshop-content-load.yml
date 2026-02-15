@@ -57,7 +57,7 @@ jobs:
           WRANGLER_CONFIG_JSON="$(
             node -e '
               const fs = require("fs");
-              const path = process.argv[1];
+              const path = process.argv[2];
               const raw = fs.readFileSync(path, "utf8");
               const stripped = raw
                 .replace(/\/\*[\s\S]*?\*\//g, "")
