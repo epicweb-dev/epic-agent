@@ -106,14 +106,7 @@ export async function registerTools(agent: MCP) {
 		{
 			description:
 				'Retrieve workshop context for quiz authoring by scope or random',
-			inputSchema: {
-				workshop: z.string().trim().min(1).optional(),
-				exerciseNumber: z.coerce.number().int().positive().optional(),
-				stepNumber: z.coerce.number().int().positive().optional(),
-				random: z.boolean().optional(),
-				maxChars: z.coerce.number().int().positive().optional(),
-				cursor: z.string().optional(),
-			},
+			inputSchema: retrieveLearningContextInputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = retrieveLearningContextInputSchema.safeParse(rawArgs)

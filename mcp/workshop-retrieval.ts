@@ -24,13 +24,16 @@ type VectorSearchEnv = Env & {
 }
 
 function resolvePayloadLimits(env: Env) {
-	const defaultMaxChars = Math.max(
-		1,
-		env.WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS ?? defaultContextMaxChars,
-	)
 	const hardMaxChars = Math.max(
-		defaultMaxChars,
+		1,
 		env.WORKSHOP_CONTEXT_HARD_MAX_CHARS ?? defaultHardMaxChars,
+	)
+	const defaultMaxChars = Math.min(
+		hardMaxChars,
+		Math.max(
+			1,
+			env.WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS ?? defaultContextMaxChars,
+		),
 	)
 	return { defaultMaxChars, hardMaxChars }
 }
