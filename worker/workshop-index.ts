@@ -93,10 +93,13 @@ export async function handleWorkshopIndexRequest(
 	}
 
 	let body: unknown = {}
-	try {
-		body = await request.json()
-	} catch {
-		// Body is optional. Continue with defaults when absent.
+	const requestBody = await request.text()
+	if (requestBody.trim().length > 0) {
+		try {
+			body = JSON.parse(requestBody) as unknown
+		} catch {
+			return invalidReindexPayloadResponse(['Request body must be valid JSON.'])
+		}
 	}
 	const parsedBody = reindexBodySchema.safeParse(body)
 	if (!parsedBody.success) {

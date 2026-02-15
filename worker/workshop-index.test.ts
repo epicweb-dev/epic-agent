@@ -65,6 +65,43 @@ test('workshop index route validates payload shape', async () => {
 	expect(response.status).toBe(400)
 })
 
+test('workshop index route rejects malformed json payloads', async () => {
+	let reindexCalled = false
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: '{"workshops":["mcp-fundamentals"]',
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				reindexCalled = true
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(400)
+	expect(reindexCalled).toBe(false)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: ['Request body must be valid JSON.'],
+	})
+})
+
 test('workshop index route rejects oversized workshop filters', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
