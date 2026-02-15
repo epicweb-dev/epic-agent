@@ -55,17 +55,17 @@ jobs:
           fi
 
           WRANGLER_CONFIG_JSON="$(
-            node - "$WRANGLER_CONFIG_PATH" <<'NODE'
-const fs = require("fs");
-const path = process.argv[2];
-const raw = fs.readFileSync(path, "utf8");
-const stripped = raw
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/^\s*\/\/.*$/gm, "")
-  .replace(/,\s*([}\]])/g, "$1");
-const data = JSON.parse(stripped);
-process.stdout.write(JSON.stringify(data));
-NODE
+            node -e '
+              const fs = require("fs");
+              const path = process.argv[1];
+              const raw = fs.readFileSync(path, "utf8");
+              const stripped = raw
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .replace(/^\s*\/\/.*$/gm, "")
+                .replace(/,\s*([}\]])/g, "$1");
+              const data = JSON.parse(stripped);
+              process.stdout.write(JSON.stringify(data));
+            ' "$WRANGLER_CONFIG_PATH"
           )"
 
           BASE_WORKER_NAME="$(printf '%s' "$WRANGLER_CONFIG_JSON" | jq -r '.name // empty')"
