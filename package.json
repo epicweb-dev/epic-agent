@@ -20,7 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migrate:local": "bun ./wrangler-env.ts d1 migrations apply APP_DB --local",
-    "preview": "bun run migrate:local && bun ./wrangler-env.ts dev --local",
+    "preview": "bun run migrate:local && bun ./wrangler-env.ts dev --local --inspector-port 0",
     "generate-types": "bun ./wrangler-env.ts types ./types/worker-configuration.d.ts",
     "workshop-content-load": "bun tools/workshop-content-load.ts",
     "typecheck": "tsc -b --noEmit",
