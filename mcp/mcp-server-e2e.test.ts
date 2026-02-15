@@ -1114,6 +1114,41 @@ test(
 const networkTest = runWorkshopNetworkReindexTest ? test : test.skip
 
 networkTest(
+	'manual reindex endpoint rejects unknown workshop filters',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					workshops: ['not-a-real-workshop-slug-for-test'],
+				}),
+			},
+		)
+
+		expect(response.status).toBe(400)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+			details?: Array<string>
+		}
+		expect(payload.ok).toBe(false)
+		expect(payload.error).toBe('Invalid reindex payload.')
+		expect(payload.details).toEqual([
+			'Unknown workshop filter(s): not-a-real-workshop-slug-for-test.',
+		])
+	},
+	{ timeout: indexingTimeoutMs },
+)
+
+networkTest(
 	'manual reindex endpoint indexes real workshop data for retrieval tools',
 	async () => {
 		await using database = await createTestDatabase()
