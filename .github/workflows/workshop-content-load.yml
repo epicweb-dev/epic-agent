@@ -150,7 +150,7 @@ jobs:
               printf '%s' "$BASE_PAYLOAD" | jq -c \
                 --arg cursor "$NEXT_CURSOR" \
                 --argjson batchSize "$BATCH_SIZE" \
-                '. + { batchSize: $batchSize } + ( ($cursor | length) > 0 ? { cursor: $cursor } : {} )'
+                '. + { batchSize: $batchSize } + (if (($cursor | length) > 0) then { cursor: $cursor } else {} end)'
             )
             PAYLOAD_SIZE=${#PAYLOAD}
             if [ "$PAYLOAD_SIZE" -gt 50000 ]; then

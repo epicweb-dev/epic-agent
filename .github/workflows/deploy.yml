@@ -172,9 +172,7 @@ jobs:
           fi
 
       - name: 🔐 Sync Cloudflare Secrets (Stable Preview)
-        if:
-          github.ref == 'refs/heads/main' &&
-          env.CLOUDFLARE_API_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
         run: |
           PREVIEW_WORKER_NAME="epic-agent-preview"
           if [ -n "$COOKIE_SECRET" ]; then
@@ -213,13 +211,15 @@ jobs:
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
-        run: bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env preview
+        run:
+          bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
+          preview
 
       - name: 🗄️ Apply D1 Migrations (Stable Preview)
-        if:
-          github.ref == 'refs/heads/main' &&
-          env.CLOUDFLARE_API_TOKEN != ''
-        run: bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env preview
+        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
+        run:
+          bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
+          preview
 
       - name: 🏗️ Build
         run: bun run build
@@ -235,13 +235,12 @@ jobs:
           env.CLOUDFLARE_API_TOKEN != ''
         env:
           CLOUDFLARE_ENV: preview
-          PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
+          PREVIEW_WORKER_NAME:
+            epic-agent-pr-${{ github.event.pull_request.number }}
         run: bun ./wrangler-env.ts deploy --name "$PREVIEW_WORKER_NAME"
 
       - name: ☁️ Deploy Stable Preview to Cloudflare Workers
-        if:
-          github.ref == 'refs/heads/main' &&
-          env.CLOUDFLARE_API_TOKEN != ''
+        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
         env:
           CLOUDFLARE_ENV: preview
         run: bun ./wrangler-env.ts deploy --name epic-agent-preview
@@ -253,7 +252,8 @@ jobs:
           env.CLOUDFLARE_API_TOKEN != ''
         uses: actions/github-script@v7
         env:
-          PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
+          PREVIEW_WORKER_NAME:
+            epic-agent-pr-${{ github.event.pull_request.number }}
         with:
           script: |
             const marker = '<!-- preview-deploy-comment -->'
@@ -314,8 +314,7 @@ jobs:
     runs-on: ubuntu-latest
     name: 🧽 Cleanup Preview
     if:
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
       github.event.pull_request.head.repo.fork == false &&
       secrets.CLOUDFLARE_API_TOKEN != ''
     env:
