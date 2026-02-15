@@ -74,6 +74,13 @@ Configure these secrets for deploy workflows:
 - `GITHUB_TOKEN` (optional, recommended for indexing throughput)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)
 
+To load workshop content into D1 + Vectorize from CI, run the
+`🧠 Load Workshop Content` GitHub Actions workflow (`workflow_dispatch`):
+
+- choose `production` or `preview` target environment
+- optionally provide a comma-separated workshop list to limit indexing scope
+- leave the workshop list empty to index all discovered workshop repositories
+
 When PR preview deploys run, CI updates a pull request comment with the preview
 URL (when available from `APP_BASE_URL_PREVIEW`/`APP_BASE_URL`) and a link to
 the workflow run.

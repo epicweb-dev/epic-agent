@@ -1,0 +1,108 @@
+name: 🧠 Load Workshop Content
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target Cloudflare environment
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - preview
+      workshops:
+        description:
+          Optional comma-separated workshop slugs. Leave empty to index all.
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  load-workshop-content:
+    name: 🧠 Reindex workshops into D1 + Vectorize
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔎 Resolve target environment URL
+        id: target
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          APP_BASE_URL_PREVIEW: ${{ secrets.APP_BASE_URL_PREVIEW }}
+        run: |
+          if [ "$TARGET_ENVIRONMENT" = "preview" ]; then
+            TARGET_URL="${APP_BASE_URL_PREVIEW:-$APP_BASE_URL}"
+          else
+            TARGET_URL="$APP_BASE_URL"
+          fi
+
+          TARGET_URL="${TARGET_URL%/}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "Missing APP_BASE_URL secret (and APP_BASE_URL_PREVIEW for preview)." >&2
+            exit 1
+          fi
+
+          echo "target_url=$TARGET_URL" >> "$GITHUB_OUTPUT"
+
+      - name: 🔐 Verify admin token
+        env:
+          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
+            echo "Missing WORKSHOP_INDEX_ADMIN_TOKEN secret." >&2
+            exit 1
+          fi
+
+      - name: 🚚 Load workshop content into D1 and Vectorize
+        env:
+          TARGET_URL: ${{ steps.target.outputs.target_url }}
+          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
+          WORKSHOP_LIST_INPUT: ${{ inputs.workshops }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [ -n "$WORKSHOP_LIST_INPUT" ]; then
+            WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')
+            PAYLOAD=$(jq -nc --argjson workshops "$WORKSHOPS_JSON" '{ workshops: $workshops }')
+          else
+            PAYLOAD='{}'
+          fi
+
+          RESPONSE_FILE=$(mktemp)
+          HTTP_STATUS=$(
+            curl --silent --show-error \
+              --output "$RESPONSE_FILE" \
+              --write-out '%{http_code}' \
+              --request POST \
+              --url "$TARGET_URL/internal/workshop-index/reindex" \
+              --header "Authorization: Bearer $WORKSHOP_INDEX_ADMIN_TOKEN" \
+              --header 'Content-Type: application/json' \
+              --data "$PAYLOAD"
+          )
+
+          RESPONSE_BODY=$(<"$RESPONSE_FILE")
+          echo "Reindex response: $RESPONSE_BODY"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Workshop content load failed with HTTP $HTTP_STATUS" >&2
+            exit 1
+          fi
+
+          WORKSHOP_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.workshopCount // 0')
+          EXERCISE_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.exerciseCount // 0')
+          STEP_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.stepCount // 0')
+          SECTION_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionCount // 0')
+          SECTION_CHUNK_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionChunkCount // 0')
+
+          {
+            echo "## Workshop content load complete"
+            echo ""
+            echo "- Environment: $TARGET_ENVIRONMENT"
+            echo "- Target URL: $TARGET_URL"
+            echo "- Workshop count: $WORKSHOP_COUNT"
+            echo "- Exercise count: $EXERCISE_COUNT"
+            echo "- Step count: $STEP_COUNT"
+            echo "- Section count: $SECTION_COUNT"
+            echo "- Section chunk count: $SECTION_CHUNK_COUNT"
+          } >> "$GITHUB_STEP_SUMMARY"
