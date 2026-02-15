@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const topicSearchMaxLimit = 20
+
 export const listWorkshopsInputSchema = {
 	limit: z.coerce.number().int().positive().max(100).optional(),
 	cursor: z.string().optional(),
@@ -43,7 +45,7 @@ export const searchTopicContextInputSchema = {
 		.string()
 		.trim()
 		.min(3, 'query must be at least 3 characters for topic search.'),
-	limit: z.coerce.number().int().positive().max(20).optional(),
+	limit: z.coerce.number().int().positive().max(topicSearchMaxLimit).optional(),
 	workshop: z.string().trim().min(1).optional(),
 	exerciseNumber: z.coerce.number().int().positive().optional(),
 	stepNumber: z.coerce.number().int().positive().optional(),

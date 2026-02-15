@@ -8,7 +8,10 @@ import {
 	truncateSections,
 	type RetrievalSection,
 } from './workshop-truncation.ts'
-import { type RetrieveLearningContextInput } from './workshop-contracts.ts'
+import {
+	topicSearchMaxLimit,
+	type RetrieveLearningContextInput,
+} from './workshop-contracts.ts'
 
 const defaultContextMaxChars = 50_000
 const defaultHardMaxChars = 80_000
@@ -552,7 +555,10 @@ export async function searchTopicContext({
 		)
 	}
 
-	const topK = Math.min(Math.max(limit ?? defaultVectorSearchLimit, 1), 20)
+	const topK = Math.min(
+		Math.max(limit ?? defaultVectorSearchLimit, 1),
+		topicSearchMaxLimit,
+	)
 	const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
 	const filter: Record<string, string | number> = {}
 	if (workshop) filter.workshop_slug = workshop

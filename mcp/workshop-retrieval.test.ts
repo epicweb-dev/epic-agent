@@ -1,6 +1,7 @@
 /// <reference types="bun" />
 import { expect, test } from 'bun:test'
 import { searchTopicContext } from './workshop-retrieval.ts'
+import { topicSearchMaxLimit } from './workshop-contracts.ts'
 
 type MockQueryMatch = {
 	id: string
@@ -465,4 +466,43 @@ test('searchTopicContext validates global exercise scope before embedding', asyn
 		}),
 	).rejects.toThrow('Unknown exercise 9.')
 	expect(embeddingCalls).toBe(0)
+})
+
+test('searchTopicContext clamps limit to shared max', async () => {
+	let observedTopK = 0
+	const ai = {
+		async run() {
+			return {
+				data: [[0.12, 0.34, 0.56]],
+			}
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query(_embedding: Array<number>, options?: VectorizeQueryOptions) {
+			observedTopK = options?.topK ?? 0
+			return {
+				matches: [],
+				count: 0,
+			}
+		},
+	} as unknown as Vectorize
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		globalExercises: [1],
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	const result = await searchTopicContext({
+		env,
+		query: 'schema validation',
+		limit: 999,
+		exerciseNumber: 1,
+	})
+
+	expect(observedTopK).toBe(topicSearchMaxLimit)
+	expect(result.limit).toBe(topicSearchMaxLimit)
 })
