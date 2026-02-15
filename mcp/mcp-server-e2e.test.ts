@@ -18,6 +18,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workshopIndexRequestBodyMaxChars } from '../shared/workshop-index-constants.ts'
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url))
 const migrationsDir = join(projectRoot, 'migrations')
@@ -25,7 +26,6 @@ const bunBin = process.execPath
 const defaultTimeoutMs = 60_000
 const indexingTimeoutMs = 240_000
 const testWorkshopIndexAdminToken = 'test-workshop-index-token'
-const testWorkshopIndexRequestBodyMaxChars = 50_000
 const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
 const runtimeGitHubToken = resolveRuntimeGitHubToken()
 const runWorkshopNetworkReindexTest =
@@ -1090,7 +1090,7 @@ test(
 					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
 					'Content-Type': 'application/json',
 				},
-				body: 'x'.repeat(testWorkshopIndexRequestBodyMaxChars + 1),
+				body: 'x'.repeat(workshopIndexRequestBodyMaxChars + 1),
 			},
 		)
 
@@ -1104,7 +1104,7 @@ test(
 			ok: false,
 			error: 'Reindex payload is too large.',
 			details: [
-				`Request body must be at most ${testWorkshopIndexRequestBodyMaxChars} characters.`,
+				`Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`,
 			],
 		})
 	},

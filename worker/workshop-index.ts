@@ -1,9 +1,12 @@
 import { z } from 'zod'
 import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
+import {
+	workshopFilterMaxCount,
+	workshopIndexRequestBodyMaxChars,
+} from '../shared/workshop-index-constants.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
-export const workshopFilterMaxCount = 100
-export const workshopIndexRequestBodyMaxChars = 50_000
+export { workshopFilterMaxCount, workshopIndexRequestBodyMaxChars }
 const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
 const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
 
