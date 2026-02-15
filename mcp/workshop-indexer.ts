@@ -886,7 +886,10 @@ async function buildBlobReader({
 			cache.set(sha, null)
 			return null
 		}
-		const content = atob(blob.content.replaceAll('\n', ''))
+		const base64 = blob.content.replaceAll('\n', '')
+		const content = new TextDecoder().decode(
+			Uint8Array.from(atob(base64), (char) => char.charCodeAt(0)),
+		)
 		cache.set(sha, content)
 		return content
 	}
@@ -1138,7 +1141,7 @@ async function indexWorkshopRepository({
 			])
 
 			const diffSummaries: Array<string> = []
-			const diffChunks: Array<string> = []
+			const diffChunks: Array<{ relativePath: string; diffText: string }> = []
 			let stepHasDiff = false
 
 			const sortedRelativePaths = Array.from(allRelativePaths).sort((a, b) =>
@@ -1193,7 +1196,7 @@ async function indexWorkshopRepository({
 						solutionContent: solutionContent ?? undefined,
 					}),
 				)
-				diffChunks.push(diffText)
+				diffChunks.push({ relativePath, diffText })
 			}
 
 			if (diffSummaries.length > 0) {
@@ -1215,7 +1218,8 @@ async function indexWorkshopRepository({
 					sectionOrder: sectionOrder++,
 					sectionKind: 'diff-hunk',
 					label: `Diff chunk for exercise ${exerciseNumber} step ${stepNumber}`,
-					content: toSectionContent(chunk),
+					sourcePath: chunk.relativePath,
+					content: toSectionContent(chunk.diffText),
 					isDiff: true,
 				})
 			}
