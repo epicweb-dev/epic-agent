@@ -136,6 +136,7 @@ jobs:
           STEP_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.stepCount // 0')
           SECTION_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionCount // 0')
           SECTION_CHUNK_COUNT=$(printf '%s' "$RESPONSE_BODY" | jq -r '.sectionChunkCount // 0')
+          RUN_ID=$(printf '%s' "$RESPONSE_BODY" | jq -r '.runId // "unknown"')
           REQUESTED_WORKSHOPS=$(printf '%s' "$PAYLOAD" | jq -r '.workshops // [] | join(", ")')
 
           {
@@ -148,6 +149,7 @@ jobs:
             else
               echo "- Requested workshops: all discovered workshop repositories"
             fi
+            echo "- Reindex run id: $RUN_ID"
             echo "- Workshop count: $WORKSHOP_COUNT"
             echo "- Exercise count: $EXERCISE_COUNT"
             echo "- Step count: $STEP_COUNT"
