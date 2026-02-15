@@ -630,6 +630,7 @@ export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
 	groupStepFilesByDirectory,
+	filterRequestedRepositories,
 	splitIntoChunks,
 	chunkIntoBatches,
 	buildUniqueVectorIdBatches,
@@ -743,6 +744,40 @@ async function githubJson<T>({
 	throw new Error(`GitHub API request retries exhausted for ${url.pathname}.`)
 }
 
+function filterRequestedRepositories({
+	repositories,
+	onlyWorkshops,
+}: {
+	repositories: Array<WorkshopRepository>
+	onlyWorkshops?: Array<string>
+}) {
+	const normalizedSelections = Array.from(
+		new Set(
+			(onlyWorkshops ?? []).map((workshop) => workshop.trim()).filter(Boolean),
+		),
+	)
+	if (normalizedSelections.length === 0) {
+		return repositories
+	}
+
+	const availableRepositoryNames = new Set(
+		repositories.map((repository) => repository.name),
+	)
+	const missingSelections = normalizedSelections.filter(
+		(workshop) => !availableRepositoryNames.has(workshop),
+	)
+	if (missingSelections.length > 0) {
+		throw new Error(
+			`Unknown workshop filter(s): ${missingSelections.join(', ')}.`,
+		)
+	}
+
+	const selectedWorkshops = new Set(normalizedSelections)
+	return repositories.filter((repository) =>
+		selectedWorkshops.has(repository.name),
+	)
+}
+
 async function listWorkshopRepositories({
 	env,
 	onlyWorkshops,
@@ -785,9 +820,10 @@ async function listWorkshopRepositories({
 		}
 	}
 
-	const filtered = onlyWorkshops?.length
-		? results.filter((repo) => onlyWorkshops.includes(repo.name))
-		: results
+	const filtered = filterRequestedRepositories({
+		repositories: results,
+		onlyWorkshops,
+	})
 
 	return filtered.sort((left, right) => left.name.localeCompare(right.name))
 }

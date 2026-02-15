@@ -86,6 +86,81 @@ test('groupStepFilesByDirectory groups only step blob entries', () => {
 	).toEqual(['sha-solution-index'])
 })
 
+test('filterRequestedRepositories returns all when filters are absent', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+		{
+			owner: 'epicweb-dev',
+			name: 'advanced-typescript',
+			defaultBranch: 'main',
+		},
+	]
+	const filtered = workshopIndexerTestUtils.filterRequestedRepositories({
+		repositories,
+	})
+	expect(filtered).toEqual(repositories)
+})
+
+test('filterRequestedRepositories trims, dedupes, and filters selected workshops', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+		{
+			owner: 'epicweb-dev',
+			name: 'advanced-typescript',
+			defaultBranch: 'main',
+		},
+		{
+			owner: 'epicweb-dev',
+			name: 'react-fundamentals',
+			defaultBranch: 'main',
+		},
+	]
+	const filtered = workshopIndexerTestUtils.filterRequestedRepositories({
+		repositories,
+		onlyWorkshops: [
+			' mcp-fundamentals ',
+			'advanced-typescript',
+			'mcp-fundamentals',
+		],
+	})
+	expect(filtered).toEqual([
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+		{
+			owner: 'epicweb-dev',
+			name: 'advanced-typescript',
+			defaultBranch: 'main',
+		},
+	])
+})
+
+test('filterRequestedRepositories throws for unknown requested workshops', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+	]
+	expect(() =>
+		workshopIndexerTestUtils.filterRequestedRepositories({
+			repositories,
+			onlyWorkshops: ['mcp-fundamentals', 'missing-workshop'],
+		}),
+	).toThrow('Unknown workshop filter(s): missing-workshop.')
+})
+
 test('splitIntoChunks is deterministic with overlap', () => {
 	const longContent = Array.from(
 		{ length: 220 },
