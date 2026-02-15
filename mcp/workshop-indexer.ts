@@ -57,6 +57,8 @@ const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
 const defaultVectorUpsertBatchSize = 200
 const vectorDeleteBatchSize = 500
+const githubRequestMaxAttempts = 3
+const githubRetryBaseDelayMs = 500
 
 const textFileExtensions = new Set([
 	'.ts',
@@ -122,6 +124,10 @@ const defaultDiffIgnore = [
 
 function normalizeNewlines(content: string) {
 	return content.replaceAll('\r\n', '\n')
+}
+
+function wait(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function fileExtension(path: string) {
@@ -546,6 +552,28 @@ function formatGitHubApiError({
 	return `GitHub API ${status} for ${pathname}: ${body}`
 }
 
+function shouldRetryGitHubRequest({
+	status,
+	responseBody,
+	attempt,
+	maxAttempts,
+}: {
+	status: number
+	responseBody: string
+	attempt: number
+	maxAttempts: number
+}) {
+	if (attempt >= maxAttempts) return false
+	if (status === 429 || status >= 500) return true
+	if (status === 403) {
+		const normalized = responseBody.toLowerCase()
+		if (normalized.includes('secondary rate limit')) {
+			return true
+		}
+	}
+	return false
+}
+
 export const workshopIndexerTestUtils = {
 	parseExerciseFromPath,
 	parseStepFromPath,
@@ -558,6 +586,7 @@ export const workshopIndexerTestUtils = {
 	createSimpleUnifiedDiff,
 	shouldIgnoreDiffPath,
 	formatGitHubApiError,
+	shouldRetryGitHubRequest,
 }
 
 async function githubJson<T>({
@@ -574,16 +603,42 @@ async function githubJson<T>({
 		url.search = query.toString()
 	}
 	const token = env.GITHUB_TOKEN?.trim()
-	const response = await fetch(url, {
-		headers: {
-			Accept: 'application/vnd.github+json',
-			'User-Agent': 'epic-agent-workshop-indexer',
-			'X-GitHub-Api-Version': '2022-11-28',
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-		},
-	})
-	if (!response.ok) {
+	for (let attempt = 1; attempt <= githubRequestMaxAttempts; attempt += 1) {
+		const response = await fetch(url, {
+			headers: {
+				Accept: 'application/vnd.github+json',
+				'User-Agent': 'epic-agent-workshop-indexer',
+				'X-GitHub-Api-Version': '2022-11-28',
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
+			},
+		})
+		if (response.ok) {
+			return (await response.json()) as T
+		}
+
 		const message = await response.text()
+		if (
+			shouldRetryGitHubRequest({
+				status: response.status,
+				responseBody: message,
+				attempt,
+				maxAttempts: githubRequestMaxAttempts,
+			})
+		) {
+			const retryDelayMs = githubRetryBaseDelayMs * 2 ** (attempt - 1)
+			console.warn(
+				'workshop-reindex-github-request-retry',
+				JSON.stringify({
+					pathname: url.pathname,
+					status: response.status,
+					attempt,
+					retryDelayMs,
+				}),
+			)
+			await wait(retryDelayMs)
+			continue
+		}
+
 		throw new Error(
 			formatGitHubApiError({
 				status: response.status,
@@ -595,7 +650,8 @@ async function githubJson<T>({
 			}),
 		)
 	}
-	return (await response.json()) as T
+
+	throw new Error(`GitHub API request retries exhausted for ${url.pathname}.`)
 }
 
 async function listWorkshopRepositories({

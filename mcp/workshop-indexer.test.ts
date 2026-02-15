@@ -228,3 +228,57 @@ test('formatGitHubApiError suggests retry for tokened rate limits', () => {
 	expect(message).toContain('configured GITHUB_TOKEN appears rate-limited')
 	expect(message).toContain('Rate limit remaining: 12')
 })
+
+test('shouldRetryGitHubRequest retries transient statuses', () => {
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 500,
+			responseBody: 'internal error',
+			attempt: 1,
+			maxAttempts: 3,
+		}),
+	).toBe(true)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 429,
+			responseBody: 'too many requests',
+			attempt: 2,
+			maxAttempts: 3,
+		}),
+	).toBe(true)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 403,
+			responseBody: 'Secondary rate limit exceeded',
+			attempt: 1,
+			maxAttempts: 3,
+		}),
+	).toBe(true)
+})
+
+test('shouldRetryGitHubRequest stops at max attempts and non-retriable errors', () => {
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 500,
+			responseBody: 'internal error',
+			attempt: 3,
+			maxAttempts: 3,
+		}),
+	).toBe(false)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 404,
+			responseBody: 'not found',
+			attempt: 1,
+			maxAttempts: 3,
+		}),
+	).toBe(false)
+	expect(
+		workshopIndexerTestUtils.shouldRetryGitHubRequest({
+			status: 403,
+			responseBody: 'API rate limit exceeded',
+			attempt: 1,
+			maxAttempts: 3,
+		}),
+	).toBe(false)
+})

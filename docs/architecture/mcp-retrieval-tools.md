@@ -90,3 +90,6 @@ Indexing is manual-only and handled outside MCP tool calls via:
 
 This route refreshes indexed workshop metadata, sections, and optional vector
 chunks used by retrieval tools.
+
+Indexer GitHub API requests include bounded retry/backoff for transient failures
+(5xx/429 and secondary rate limits) before surfacing an error.
