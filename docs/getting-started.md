@@ -71,13 +71,32 @@ bun ./docs/post-download.ts --guided
 
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
+- `CLOUDFLARE_ACCOUNT_ID` (recommended for reliable token-based Wrangler CI
+  commands)
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
+- `APP_BASE_URL` (production app URL)
+- `APP_BASE_URL_PREVIEW` (optional preview URL for PR preview deploys)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected workshop reindex calls)
+- `GITHUB_TOKEN` (optional but recommended for higher indexing throughput)
 
 3. Deploy:
 
 ```
 bun run deploy
 ```
+
+## Load workshop content in GitHub Actions
+
+After deploy, run the `🧠 Load Workshop Content` workflow from the Actions tab
+to populate D1 and Vectorize via the protected reindex endpoint.
+
+- choose the target environment (`production` or `preview`)
+- choose a batch size (workshops processed per request, default 5)
+- optionally provide comma/newline-separated workshop slugs to scope the index
+  run
+- provided workshop slugs are trimmed, lowercased, and deduplicated before
+  reindex starts
+- leave workshop input empty to index all workshop repositories
 
 ## Agent/CI setup
 
@@ -108,6 +127,13 @@ To preview changes without writing, add `--dry-run`. To emit a JSON summary, add
 ## Local development
 
 See `docs/agents/setup.md` for local dev commands and verification steps.
+
+Quick verification commands:
+
+```
+bun run test:mcp:unit
+bun run validate
+```
 
 ## Build and deploy
 

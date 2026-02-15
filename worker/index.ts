@@ -16,6 +16,10 @@ import {
 	mcpResourcePath,
 } from './mcp-auth.ts'
 import { withCors } from './utils.ts'
+import {
+	handleWorkshopIndexRequest,
+	workshopIndexRoutePath,
+} from './workshop-index.ts'
 
 export { MCP }
 
@@ -64,6 +68,10 @@ const appHandler = withCors({
 					binding: 'MCP_OBJECT',
 				}).fetch,
 			})
+		}
+
+		if (url.pathname === workshopIndexRoutePath) {
+			return handleWorkshopIndexRequest(request, env)
 		}
 
 		// Try to serve static assets for safe methods only

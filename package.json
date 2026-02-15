@@ -24,11 +24,13 @@
     "generate-types": "bun ./wrangler-env.ts types ./types/worker-configuration.d.ts",
     "typecheck": "tsc -b --noEmit",
     "inspect": "bunx -p @mcpjam/inspector inspector",
-    "validate": "concurrently --kill-others-on-fail -n format,lint,build,typecheck,test,test:mcp -c green,yellow,blue,magenta,cyan,red \"bun run format:check\" \"bun run lint:fix\" \"bun run build\" \"bun run typecheck\" \"bun run test:e2e\" \"bun run test:mcp\"",
+    "validate": "concurrently --kill-others-on-fail -n format,lint,build,typecheck,test,test:mcp-unit,test:mcp -c green,yellow,blue,magenta,cyan,white,red \"bun run format:check\" \"bun run lint:fix\" \"bun run build\" \"bun run typecheck\" \"bun run test:e2e\" \"bun run test:mcp:unit\" \"bun run test:mcp\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install chromium --with-deps",
-    "test:mcp": "bun test mcp/mcp-server-e2e.test.ts"
+    "test:mcp:unit": "bun test mcp/workshop-data.test.ts mcp/workshop-indexer.test.ts mcp/workshop-retrieval.test.ts mcp/workshop-truncation.test.ts worker/workshop-index.test.ts",
+    "test:mcp": "bun test mcp/mcp-server-e2e.test.ts",
+    "test:mcp:network": "cross-env RUN_WORKSHOP_NETWORK_TESTS=1 bun test mcp/mcp-server-e2e.test.ts"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.25.0",

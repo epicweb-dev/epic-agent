@@ -74,6 +74,9 @@
 			],
 		},
 		"test": {
+			"vars": {
+				"WORKSHOP_INDEX_ADMIN_TOKEN": "test-workshop-index-token",
+			},
 			"assets": {
 				"directory": "./public",
 				"binding": "ASSETS",

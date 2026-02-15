@@ -13,6 +13,12 @@ Create or provide the following resources (prod + preview):
   - `binding`: `OAUTH_KV`
   - title (prod): `<app-name>-oauth`
   - title (preview): `<app-name>-oauth-preview`
+- (Optional for workshop semantic indexing) Vectorize index
+  - `binding`: `WORKSHOP_VECTOR_INDEX`
+  - used for chunk embedding upserts during manual workshop indexing
+- (Optional for workshop semantic indexing) Workers AI binding
+  - `binding`: `AI`
+  - used to generate embeddings when Vectorize indexing is enabled
 
 The post-download script will write the resulting IDs into `wrangler.jsonc`.
 
@@ -39,6 +45,22 @@ Local development uses `.env`, which Wrangler loads automatically:
 - `RESEND_API_BASE_URL` (optional, defaults to `https://api.resend.com`)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
+- `GITHUB_TOKEN` (optional but recommended for workshop indexing rate limits)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required to call manual reindex endpoint)
+- `WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS` (optional, default `50000`)
+- `WORKSHOP_CONTEXT_HARD_MAX_CHARS` (optional, default `80000`)
+
+Manual reindex endpoint:
+
+- `POST /internal/workshop-index/reindex`
+- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
+  case-insensitive)
+
+The reindex endpoint also supports cursor batching to reduce the risk of
+long-running requests:
+
+- request fields: `cursor` and `batchSize` (1-20)
+- response field: `nextCursor` (present when more workshops remain)
 
 Tests use `.env.test` when `CLOUDFLARE_ENV=test` (set by Playwright).
 
@@ -48,6 +70,51 @@ Configure these secrets for deploy workflows:
 
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
+- `CLOUDFLARE_ACCOUNT_ID` (recommended for reliable token-based Wrangler
+  commands in CI)
 - `COOKIE_SECRET` (same format as local)
+- `APP_BASE_URL` (production base URL)
+- `APP_BASE_URL_PREVIEW` (optional preview base URL; falls back to
+  `APP_BASE_URL` when omitted)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
+- `GITHUB_TOKEN` (optional, recommended for indexing throughput)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)
+
+To load workshop content into D1 + Vectorize from CI, run the
+`🧠 Load Workshop Content` GitHub Actions workflow (`workflow_dispatch`):
+
+- choose `production` or `preview` target environment
+- optionally provide a comma/newline-separated workshop list to limit indexing
+  scope
+- leave the workshop list empty to index all discovered workshop repositories
+- workshop slugs are trimmed, lowercased, and deduplicated before sending the
+  reindex payload
+- workshop filters are capped at 100 unique slugs after normalization
+- normalized reindex payloads must remain within the route body-size limit
+  (50,000 characters)
+- if the provided workshop list collapses to empty after trimming/deduping, the
+  workflow falls back to indexing all discovered workshop repositories
+- if any requested workshop slug is unknown, reindex fails fast with an explicit
+  `400` response naming missing workshops
+- target URLs must be absolute `http://` or `https://` base URLs
+- the workflow retries transient network failures when calling the protected
+  reindex endpoint
+- reindex HTTP calls use connect/request timeouts to avoid hanging CI jobs
+- the workflow paginates reindex requests when needed:
+  - it sets `batchSize` (default 5, max 20)
+  - it continues calling the route while `nextCursor` is returned
+- the workflow expects a successful JSON response (`ok: true`) from the reindex
+  endpoint and fails fast otherwise
+- when the reindex endpoint returns an error JSON payload, the workflow surfaces
+  both `error` and `details` fields in job logs for faster diagnosis (whether
+  `details` is returned as an array or a string)
+- workflow summary output includes the returned reindex run ids for easier log
+  correlation (`workshop_index_runs.id`)
+
+When PR preview deploys run, CI updates a pull request comment with the preview
+URL (when available from `APP_BASE_URL_PREVIEW`/`APP_BASE_URL`) and a link to
+the workflow run.
+
+If `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` are not configured, cloud
+deploy/migration steps are skipped in CI.

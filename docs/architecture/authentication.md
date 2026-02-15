@@ -63,10 +63,19 @@ OAuth endpoints are implemented in `worker/oauth-handlers.ts` and routed from
 
 `/mcp` is protected by `worker/mcp-auth.ts`:
 
-- Requires `Authorization: Bearer <token>`
+- Requires `Authorization: Bearer <token>` (bearer scheme is case-insensitive)
 - Token is validated via OAuth provider helpers (`unwrapToken`)
 - Audience must match the app origin or `<origin>/mcp`
 - Unauthenticated requests return `401` with `WWW-Authenticate` metadata
+
+## Admin token for workshop reindex
+
+`POST /internal/workshop-index/reindex` is protected with a dedicated bearer
+token (`WORKSHOP_INDEX_ADMIN_TOKEN`). This endpoint is intended for explicit
+manual indexing runs and is separate from OAuth MCP auth.
+
+The admin token uses the `Authorization: Bearer <token>` header, where the
+bearer scheme is case-insensitive (`Bearer` / `bearer`).
 
 ## What to read when changing auth
 

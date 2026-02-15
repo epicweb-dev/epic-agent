@@ -14,7 +14,8 @@ export class MCP extends McpAgent<Env, State, Props> {
 			version: '1.0.0',
 		},
 		{
-			instructions: `Use this server to solve math problems reliably and accurately.`,
+			instructions:
+				'Use this server to retrieve indexed Epic Workshop context for quiz authoring.',
 		},
 	)
 	async init() {
@@ -27,5 +28,8 @@ export class MCP extends McpAgent<Env, State, Props> {
 			'This should never happen, but somehow we did not get the baseUrl from the request handler',
 		)
 		return baseUrl
+	}
+	requireEnv() {
+		return this.env
 	}
 }
