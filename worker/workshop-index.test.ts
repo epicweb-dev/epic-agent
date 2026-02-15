@@ -54,6 +54,28 @@ test('workshop index route rejects invalid bearer token', async () => {
 	expect(response.status).toBe(401)
 })
 
+test('workshop index route accepts lowercase bearer authorization scheme', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: '{"workshops":["mcp-fundamentals"]',
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: ['Request body must be valid JSON.'],
+	})
+})
+
 test('workshop index route validates payload shape', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {

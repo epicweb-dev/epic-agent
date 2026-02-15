@@ -90,8 +90,11 @@ function parseRequestContentLength(request: Request) {
 
 function getBearerToken(request: Request) {
 	const header = request.headers.get('Authorization')
-	if (!header || !header.startsWith('Bearer ')) return null
-	return header.slice('Bearer '.length).trim()
+	if (!header) return null
+	const bearerTokenMatch = header.match(/^bearer\s+(.+)$/i)
+	if (!bearerTokenMatch) return null
+	const token = bearerTokenMatch[1]?.trim()
+	return token && token.length > 0 ? token : null
 }
 
 export async function handleWorkshopIndexRequest(

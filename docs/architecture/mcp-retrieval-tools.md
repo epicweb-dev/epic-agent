@@ -94,7 +94,8 @@ If bindings are missing, the tool returns an explicit unavailability error.
 Indexing is manual-only and handled outside MCP tool calls via:
 
 - `POST /internal/workshop-index/reindex`
-- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>`
+- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
+  case-insensitive)
 
 This route refreshes indexed workshop metadata, sections, and optional vector
 chunks used by retrieval tools. Optional `workshops` filters may be sent as an

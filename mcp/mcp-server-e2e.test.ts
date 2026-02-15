@@ -1107,6 +1107,70 @@ test(
 )
 
 test(
+	'manual reindex endpoint rejects invalid bearer tokens',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer not-the-right-token',
+					'Content-Type': 'application/json',
+				},
+				body: '{}',
+			},
+		)
+
+		expect(response.status).toBe(401)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+		}
+		expect(payload).toEqual({
+			ok: false,
+			error: 'Unauthorized',
+		})
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'manual reindex endpoint accepts lowercase bearer authorization scheme',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: '{"workshops":["mcp-fundamentals"]',
+			},
+		)
+
+		expect(response.status).toBe(400)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+			details?: Array<string>
+		}
+		expect(payload).toEqual({
+			ok: false,
+			error: 'Invalid reindex payload.',
+			details: ['Request body must be valid JSON.'],
+		})
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
 	'manual reindex endpoint rejects oversized payloads',
 	async () => {
 		await using database = await createTestDatabase()
