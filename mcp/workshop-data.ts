@@ -396,7 +396,23 @@ export async function replaceWorkshopIndex({
 			workshopSlug: workshop.workshopSlug,
 		})
 
-		const statements: Array<D1PreparedStatement> = [
+		const batchSize = 100
+		const statements: Array<D1PreparedStatement> = []
+
+		const flushStatements = async () => {
+			if (statements.length === 0) return
+			const batch = statements.splice(0, statements.length)
+			await db.batch(batch)
+		}
+
+		const queueStatement = async (statement: D1PreparedStatement) => {
+			statements.push(statement)
+			if (statements.length >= batchSize) {
+				await flushStatements()
+			}
+		}
+
+		await queueStatement(
 			db
 				.prepare(
 					`
@@ -428,10 +444,10 @@ export async function replaceWorkshopIndex({
 					new Date().toISOString(),
 					runId,
 				),
-		]
+		)
 
 		for (const exercise of exercises) {
-			statements.push(
+			await queueStatement(
 				db
 					.prepare(
 						`
@@ -453,7 +469,7 @@ export async function replaceWorkshopIndex({
 		}
 
 		for (const step of steps) {
-			statements.push(
+			await queueStatement(
 				db
 					.prepare(
 						`
@@ -479,7 +495,7 @@ export async function replaceWorkshopIndex({
 		}
 
 		for (const section of sections) {
-			statements.push(
+			await queueStatement(
 				db
 					.prepare(
 						`
@@ -515,7 +531,7 @@ export async function replaceWorkshopIndex({
 		}
 
 		for (const sectionChunk of sectionChunks) {
-			statements.push(
+			await queueStatement(
 				db
 					.prepare(
 						`
@@ -546,10 +562,7 @@ export async function replaceWorkshopIndex({
 			)
 		}
 
-		const batchSize = 100
-		for (let index = 0; index < statements.length; index += batchSize) {
-			await db.batch(statements.slice(index, index + batchSize))
-		}
+		await flushStatements()
 	} catch (error) {
 		const originalMessage =
 			error instanceof Error ? error.message : String(error)

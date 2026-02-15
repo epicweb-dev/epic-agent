@@ -41,6 +41,12 @@ type D1Query = {
 	params?: Array<unknown>
 }
 
+type RemoteD1Result<T> = Omit<D1Result<T>, 'success'> & {
+	success: boolean
+	error?: string
+	errors?: Array<CloudflareApiError>
+}
+
 type VectorizeIndexResolution =
 	| { enabled: false }
 	| { enabled: true; indexName: string; source: 'wrangler' | 'env' | 'default' }
@@ -180,6 +186,13 @@ function formatCloudflareErrors(errors: Array<CloudflareApiError> | undefined) {
 			return `${message}${code}`.trim()
 		})
 		.join('; ')
+}
+
+function formatD1ResultError(result: RemoteD1Result<unknown>) {
+	if (typeof result.error === 'string' && result.error.trim().length > 0) {
+		return result.error.trim()
+	}
+	return formatCloudflareErrors(result.errors)
 }
 
 async function cloudflareFetchEnvelope<T>({
@@ -346,13 +359,21 @@ class RemoteD1Database {
 		})
 
 		const path = `/accounts/${this.#accountId}/d1/database/${this.#databaseId}/query`
-		const result = await cloudflareRequestJson<Array<D1Result<T>>>({
+		const result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
 			apiToken: this.#apiToken,
 			path,
 			method: 'POST',
 			body: queries,
 		})
-		return result
+		for (const [index, entry] of result.entries()) {
+			if (entry?.success === true) continue
+			const errorDetails = entry ? formatD1ResultError(entry) : ''
+			const suffix = errorDetails ? `: ${errorDetails}` : ''
+			throw new Error(
+				`Cloudflare D1 batch query failed at index ${index}${suffix}`,
+			)
+		}
+		return result as Array<D1Result<T>>
 	}
 
 	async exec(query: string) {
@@ -386,7 +407,7 @@ class RemoteD1Database {
 			sql,
 			...(params && params.length > 0 ? { params } : {}),
 		}
-		const result = await cloudflareRequestJson<Array<D1Result<T>>>({
+		const result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
 			apiToken: this.#apiToken,
 			path,
 			method: 'POST',
@@ -397,7 +418,12 @@ class RemoteD1Database {
 		if (!first) {
 			throw new Error('Cloudflare D1 query returned an empty result array.')
 		}
-		return first
+		if (first.success !== true) {
+			const errorDetails = formatD1ResultError(first)
+			const suffix = errorDetails ? `: ${errorDetails}` : ''
+			throw new Error(`Cloudflare D1 query failed${suffix}`)
+		}
+		return first as D1Result<T>
 	}
 
 	async execute(query: string): Promise<D1Result<Record<string, unknown>>> {
