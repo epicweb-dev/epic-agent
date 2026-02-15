@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
 
           if [ -n "$WORKSHOP_LIST_INPUT" ]; then
-            WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')
+            WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique')
             PAYLOAD=$(jq -nc --argjson workshops "$WORKSHOPS_JSON" '{ workshops: $workshops }')
           else
             PAYLOAD='{}'
@@ -82,6 +82,9 @@ jobs:
           RESPONSE_FILE=$(mktemp)
           HTTP_STATUS=$(
             curl --silent --show-error \
+              --retry 3 \
+              --retry-all-errors \
+              --retry-delay 2 \
               --output "$RESPONSE_FILE" \
               --write-out '%{http_code}' \
               --request POST \
