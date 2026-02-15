@@ -267,6 +267,50 @@ test('workshop index route accepts urlencoded form bodies as a fallback', async 
 	expect(capturedBatchSize).toBe(5)
 })
 
+test(
+	'workshop index route accepts urlencoded bodies with empty optional fields',
+	async () => {
+		let capturedWorkshops: Array<string> | undefined
+		let capturedCursor: string | undefined
+		let capturedBatchSize: number | undefined
+		const response = await handleWorkshopIndexRequest(
+			new Request(`https://example.com${workshopIndexRoutePath}`, {
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer admin-token',
+					'Content-Type': 'application/x-www-form-urlencoded',
+				},
+				body: new URLSearchParams({
+					workshops: '',
+					cursor: '',
+					batchSize: '5',
+				}).toString(),
+			}),
+			createEnv(),
+			{
+				runWorkshopReindexFn: async ({ onlyWorkshops, cursor, batchSize }) => {
+					capturedWorkshops = onlyWorkshops
+					capturedCursor = cursor
+					capturedBatchSize = batchSize
+					return {
+						runId: 'run-123',
+						workshopCount: 0,
+						exerciseCount: 0,
+						stepCount: 0,
+						sectionCount: 0,
+						sectionChunkCount: 0,
+					}
+				},
+			},
+		)
+
+		expect(response.status).toBe(200)
+		expect(capturedWorkshops).toBeUndefined()
+		expect(capturedCursor).toBeUndefined()
+		expect(capturedBatchSize).toBe(5)
+	},
+)
+
 test('workshop index route rejects oversized request bodies', async () => {
 	let reindexCalled = false
 	const response = await handleWorkshopIndexRequest(
