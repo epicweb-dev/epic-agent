@@ -1058,7 +1058,9 @@ networkTest(
 					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ workshops: ['mcp-fundamentals'] }),
+				body: JSON.stringify({
+					workshops: ' MCP-FUNDAMENTALS,\nmcp-fundamentals ',
+				}),
 			},
 		)
 		const reindexPayload = (await reindexResponse.json()) as {
