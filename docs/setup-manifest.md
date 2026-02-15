@@ -121,7 +121,8 @@ When PR preview deploys run, CI deploys a unique Worker per PR named
 `epic-agent-pr-<number>`, updates a pull request comment with the computed
 workers.dev preview URL, and links to the workflow run.
 
-When the PR is closed, CI automatically deletes the corresponding preview Worker.
+When the PR is closed, CI automatically deletes the corresponding preview
+Worker.
 
 If `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` are not configured, cloud
 deploy/migration steps and preview URL computation are skipped in CI.
