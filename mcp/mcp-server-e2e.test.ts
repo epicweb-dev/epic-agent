@@ -40,9 +40,11 @@ function delay(ms: number) {
 }
 
 function resolveRuntimeGitHubToken() {
-	const configuredToken = process.env.GITHUB_TOKEN?.trim()
+	const configuredToken =
+		process.env.GITHUB_TOKEN?.trim() ?? process.env.GH_TOKEN?.trim()
 	if (configuredToken) return configuredToken
 	if (!runWorkshopNetworkTests) return undefined
+	if (!Bun.which('gh')) return undefined
 
 	try {
 		const tokenLookup = Bun.spawnSync({

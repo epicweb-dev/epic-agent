@@ -39,9 +39,10 @@ Quick notes for getting a local epic-agent environment running.
 - `bun run test:mcp` to run MCP server E2E tests.
 - `bun run test:mcp:network` to include network-dependent manual reindex MCP E2E
   coverage (skipped by default in `test:mcp` to avoid flaky/rate-limit failures
-  and unnecessary cost). This command uses `GITHUB_TOKEN` when set, and
-  otherwise attempts to reuse `gh auth token` locally when available. If neither
-  credential source is available, the manual reindex network case is skipped.
+  and unnecessary cost). This command uses `GITHUB_TOKEN`/`GH_TOKEN` when set,
+  and otherwise attempts to reuse `gh auth token` locally when available. If
+  neither credential source is available, the manual reindex network case is
+  skipped.
 
 ## Remote Cloudflare commands with API tokens
 
