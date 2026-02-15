@@ -21,6 +21,8 @@ Quick notes for getting a local epic-agent environment running.
   - set `WORKSHOP_INDEX_ADMIN_TOKEN` in `.env`
   - call `POST /internal/workshop-index/reindex` with
     `Authorization: Bearer <token>`
+  - optional `workshops` payload can be an array or comma/newline-delimited
+    string; values are normalized to lowercase slugs
 - Add new mock API servers by following `docs/agents/mock-api-servers.md`.
 - If you only need the client bundle or worker, use:
   - `bun run dev:client`

@@ -3,10 +3,19 @@ import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
 
+const workshopFilterSchema = z
+	.array(z.string().trim().min(1))
+	.max(100, 'workshops must include at most 100 entries.')
+
 const reindexBodySchema = z.object({
 	workshops: z
-		.array(z.string().trim().min(1))
-		.max(100, 'workshops must include at most 100 entries.')
+		.preprocess((value) => {
+			if (typeof value !== 'string') return value
+			return value
+				.split(/[\r\n,]+/)
+				.map((workshop) => workshop.trim())
+				.filter(Boolean)
+		}, workshopFilterSchema)
 		.optional(),
 })
 

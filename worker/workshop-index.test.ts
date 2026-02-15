@@ -91,6 +91,33 @@ test('workshop index route rejects oversized workshop filters', async () => {
 	})
 })
 
+test('workshop index route rejects oversized string workshop filters', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: Array.from(
+					{ length: 101 },
+					(_, index) => `workshop-${index}`,
+				).join(','),
+			}),
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: ['workshops must include at most 100 entries.'],
+	})
+})
+
 test('workshop index route returns reindex summary when authorized', async () => {
 	let capturedWorkshops: Array<string> | undefined
 	const response = await handleWorkshopIndexRequest(
@@ -202,6 +229,40 @@ test('workshop index route treats empty workshop filters as full reindex', async
 
 	expect(response.status).toBe(200)
 	expect(capturedWorkshops).toBeUndefined()
+})
+
+test('workshop index route supports comma/newline workshop filter strings', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops:
+					' MCP-FUNDAMENTALS,\nadvanced-typescript,\n\nmcp-fundamentals ',
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 2,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toEqual(['mcp-fundamentals', 'advanced-typescript'])
 })
 
 test('workshop index route returns 500 when reindex fails', async () => {
