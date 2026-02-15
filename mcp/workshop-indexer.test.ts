@@ -1,5 +1,6 @@
 /// <reference types="bun" />
 import { expect, test } from 'bun:test'
+import { workshopIndexBatchDefaultSize } from '../shared/workshop-index-constants.ts'
 import {
 	WorkshopIndexInputError,
 	workshopIndexerTestUtils,
@@ -199,6 +200,20 @@ test('resolveReindexRepositoryBatch slices repositories and returns next cursor'
 	expect(finalBatch.offset).toBe(4)
 	expect(finalBatch.batch.map((repo) => repo.name)).toEqual(['workshop-5'])
 	expect(finalBatch.nextCursor).toBeUndefined()
+})
+
+test('resolveReindexRepositoryBatch defaults to configured batch size', () => {
+	const repositories = Array.from({ length: 40 }, (_value, index) => ({
+		owner: 'epicweb-dev',
+		name: `workshop-${index + 1}`,
+		defaultBranch: 'main',
+	}))
+	const batch = workshopIndexerTestUtils.resolveReindexRepositoryBatch({
+		repositories,
+	})
+	expect(batch.limit).toBe(workshopIndexBatchDefaultSize)
+	expect(batch.batch).toHaveLength(workshopIndexBatchDefaultSize)
+	expect(batch.nextCursor).toBeTruthy()
 })
 
 test('resolveReindexRepositoryBatch clamps batch size to max limit', () => {

@@ -10,7 +10,10 @@ import {
 	type IndexedStepWrite,
 	type IndexedWorkshopWrite,
 } from './workshop-data.ts'
-import { workshopIndexBatchMaxSize } from '../shared/workshop-index-constants.ts'
+import {
+	workshopIndexBatchDefaultSize,
+	workshopIndexBatchMaxSize,
+} from '../shared/workshop-index-constants.ts'
 
 type WorkshopRepository = {
 	owner: string
@@ -108,10 +111,14 @@ function resolveReindexRepositoryBatch({
 }) {
 	const decodedCursor = decodeReindexCursor(cursor)
 	const offset = decodedCursor.offset
-	const limit =
+	const normalizedBatchSize =
 		typeof batchSize === 'number' && Number.isFinite(batchSize)
-			? Math.min(workshopIndexBatchMaxSize, Math.max(1, Math.floor(batchSize)))
-			: repositories.length
+			? batchSize
+			: workshopIndexBatchDefaultSize
+	const limit = Math.min(
+		workshopIndexBatchMaxSize,
+		Math.max(1, Math.floor(normalizedBatchSize)),
+	)
 
 	const batch = repositories.slice(offset, offset + limit)
 	const nextOffset = offset + batch.length
