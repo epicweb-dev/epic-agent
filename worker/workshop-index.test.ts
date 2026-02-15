@@ -265,6 +265,63 @@ test('workshop index route supports comma/newline workshop filter strings', asyn
 	expect(capturedWorkshops).toEqual(['mcp-fundamentals', 'advanced-typescript'])
 })
 
+test('workshop index route treats blank string workshop filters as full reindex', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: ' \n , \r\n ',
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 2,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toBeUndefined()
+})
+
+test('workshop index route rejects null workshop filters', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: null,
+			}),
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: ['Invalid input: expected array, received null'],
+	})
+})
+
 test('workshop index route returns 500 when reindex fails', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
