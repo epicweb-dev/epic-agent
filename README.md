@@ -69,6 +69,7 @@ Request → worker/index.ts
 | [`docs/environment-variables.md`](./docs/environment-variables.md)                       | Adding new env vars                      |
 | [`docs/agents/setup.md`](./docs/agents/setup.md)                                         | Local development and verification       |
 | [`docs/architecture/mcp-retrieval-tools.md`](./docs/architecture/mcp-retrieval-tools.md) | MCP workshop retrieval and indexing flow |
+| [`docs/setup-manifest.md`](./docs/setup-manifest.md)                                     | Cloud resources and CI secret checklist  |
 
 ---
 
