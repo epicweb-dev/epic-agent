@@ -398,6 +398,8 @@ test('workshop index route allows oversized duplicate workshop filters after nor
 
 test('workshop index route returns reindex summary when authorized', async () => {
 	let capturedWorkshops: Array<string> | undefined
+	let capturedCursor: string | undefined
+	let capturedBatchSize: number | undefined
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
 			method: 'POST',
@@ -413,6 +415,8 @@ test('workshop index route returns reindex summary when authorized', async () =>
 		{
 			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
 				capturedWorkshops = onlyWorkshops
+				capturedCursor = undefined
+				capturedBatchSize = undefined
 				return {
 					runId: 'run-123',
 					workshopCount: 1,
@@ -427,6 +431,8 @@ test('workshop index route returns reindex summary when authorized', async () =>
 
 	expect(response.status).toBe(200)
 	expect(capturedWorkshops).toEqual(['mcp-fundamentals'])
+	expect(capturedCursor).toBeUndefined()
+	expect(capturedBatchSize).toBeUndefined()
 	const payload = await response.json()
 	expect(payload).toEqual({
 		ok: true,
@@ -436,6 +442,55 @@ test('workshop index route returns reindex summary when authorized', async () =>
 		stepCount: 1,
 		sectionCount: 1,
 		sectionChunkCount: 2,
+	})
+})
+
+test('workshop index route forwards cursor and batch size to indexer', async () => {
+	let capturedCursor: string | undefined
+	let capturedBatchSize: number | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				cursor: 'cursor-value',
+				batchSize: 5,
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ cursor, batchSize }) => {
+				capturedCursor = cursor
+				capturedBatchSize = batchSize
+				return {
+					runId: 'run-123',
+					workshopCount: 0,
+					exerciseCount: 0,
+					stepCount: 0,
+					sectionCount: 0,
+					sectionChunkCount: 0,
+					nextCursor: 'next-cursor',
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedCursor).toBe('cursor-value')
+	expect(capturedBatchSize).toBe(5)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: true,
+		runId: 'run-123',
+		workshopCount: 0,
+		exerciseCount: 0,
+		stepCount: 0,
+		sectionCount: 0,
+		sectionChunkCount: 0,
+		nextCursor: 'next-cursor',
 	})
 })
 
