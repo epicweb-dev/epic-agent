@@ -246,6 +246,44 @@ test('workshop index route accepts whitespace-padded content-length headers', as
 	expect(reindexCalled).toBe(true)
 })
 
+test('workshop index route rejects oversized bodies even when content-length is underreported', async () => {
+	let reindexCalled = false
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+				'Content-Length': '2',
+			},
+			body: 'x'.repeat(workshopIndexRequestBodyMaxChars + 1),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				reindexCalled = true
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(413)
+	expect(reindexCalled).toBe(false)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Reindex payload is too large.',
+		details: [requestBodyMaxErrorMessage],
+	})
+})
+
 test('workshop index route rejects oversized workshop filters', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
