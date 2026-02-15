@@ -78,7 +78,8 @@ To load workshop content into D1 + Vectorize from CI, run the
 `🧠 Load Workshop Content` GitHub Actions workflow (`workflow_dispatch`):
 
 - choose `production` or `preview` target environment
-- optionally provide a comma-separated workshop list to limit indexing scope
+- optionally provide a comma/newline-separated workshop list to limit indexing
+  scope
 - leave the workshop list empty to index all discovered workshop repositories
 - workshop slugs are trimmed and deduplicated before sending the reindex payload
 - workshop filters are capped at 100 unique slugs after normalization

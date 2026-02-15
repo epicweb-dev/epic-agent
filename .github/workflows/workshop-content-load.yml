@@ -13,7 +13,8 @@ on:
           - preview
       workshops:
         description:
-          Optional comma-separated workshop slugs. Leave empty to index all.
+          Optional comma/newline-separated workshop slugs. Leave empty to index
+          all.
         required: false
         default: ''
 
@@ -78,7 +79,7 @@ jobs:
           set -euo pipefail
 
           if [ -n "$WORKSHOP_LIST_INPUT" ]; then
-            WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique')
+            WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R -s 'gsub("[\\r\\n]+"; ",") | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique')
             WORKSHOP_COUNT_INPUT=$(printf '%s' "$WORKSHOPS_JSON" | jq -r 'length')
             if [ "$WORKSHOP_COUNT_INPUT" -gt 100 ]; then
               echo "workshops input must contain at most 100 unique slugs after normalization." >&2

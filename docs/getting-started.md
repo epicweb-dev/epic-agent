@@ -91,7 +91,8 @@ After deploy, run the `🧠 Load Workshop Content` workflow from the Actions tab
 to populate D1 and Vectorize via the protected reindex endpoint.
 
 - choose the target environment (`production` or `preview`)
-- optionally provide comma-separated workshop slugs to scope the index run
+- optionally provide comma/newline-separated workshop slugs to scope the index
+  run
 - leave workshop input empty to index all workshop repositories
 
 ## Agent/CI setup
