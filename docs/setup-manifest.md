@@ -80,10 +80,14 @@ Configure these secrets for deploy workflows:
   private workshop repos; defaults to the GitHub Actions token when absent)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (optional; only required if you still want to
   call the protected manual reindex endpoint on the deployed Worker)
-- `WORKSHOP_VECTORIZE_INDEX_NAME` (optional; enables Vectorize upserts during CI
-  indexing in production)
-- `WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW` (optional; enables Vectorize upserts
-  during CI indexing in preview)
+- `WORKSHOP_VECTORIZE_INDEX_NAME` (optional; override Vectorize index name for
+  CI indexing in production; otherwise defaults to
+  `<wrangler.jsonc name>-workshop-vector-index`)
+- `WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW` (optional; override Vectorize index
+  name for CI indexing in preview; otherwise defaults to
+  `<wrangler.jsonc name>-workshop-vector-index-preview`)
+- `WORKSHOP_VECTORIZE_DISABLED` (optional; set to `true`/`1`/`yes` to skip
+  Vectorize + Workers AI calls during CI indexing)
 
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 
@@ -109,9 +113,9 @@ To load workshop content into D1 + Vectorize from CI, run the
   - reads `wrangler.jsonc` to locate the environment-specific `APP_DB` database
     id
   - indexes workshops directly into D1 using the Cloudflare D1 API
-  - when `WORKSHOP_VECTORIZE_INDEX_NAME` (or preview equivalent) is configured,
-    generates embeddings via the Workers AI API and upserts vectors into the
-    configured Vectorize index
+  - unless `WORKSHOP_VECTORIZE_DISABLED` is set, ensures a Vectorize index
+    exists (auto-creating it when missing), generates embeddings via the Workers
+    AI API, and upserts vectors into Vectorize
   - paginates over workshop repositories using `batchSize` (default 5, max 20)
     until all workshops are processed
 - workflow summary output includes the generated reindex run ids for easier log

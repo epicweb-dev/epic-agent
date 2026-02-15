@@ -13,12 +13,13 @@ type CloudflareApiError = {
 
 type CloudflareApiEnvelope<T> = {
 	success: boolean
-	result: T
+	result?: T
 	errors?: Array<CloudflareApiError>
 	messages?: Array<unknown>
 }
 
 type WranglerConfig = {
+	name?: string
 	env?: Record<
 		string,
 		{
@@ -40,6 +41,10 @@ type D1Query = {
 	params?: Array<unknown>
 }
 
+type VectorizeIndexResolution =
+	| { enabled: false }
+	| { enabled: true; indexName: string; source: 'wrangler' | 'env' | 'default' }
+
 function stripJsonc(value: string) {
 	return value
 		.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -50,6 +55,18 @@ function stripJsonc(value: string) {
 function loadWranglerConfig(): WranglerConfig {
 	const raw = readFileSync('wrangler.jsonc', 'utf8')
 	return JSON.parse(stripJsonc(raw)) as WranglerConfig
+}
+
+function resolveDefaultVectorizeIndexName({
+	config,
+	environment,
+}: {
+	config: WranglerConfig
+	environment: 'production' | 'preview'
+}) {
+	const baseName = (config.name ?? 'epic-agent').trim() || 'epic-agent'
+	const suffix = environment === 'preview' ? '-preview' : ''
+	return `${baseName}-workshop-vector-index${suffix}`
 }
 
 function normalizeOptionalCsvInput(value: string) {
@@ -94,12 +111,23 @@ function resolveVectorizeIndexName({
 }: {
 	config: WranglerConfig
 	environment: 'production' | 'preview'
-}) {
+}): VectorizeIndexResolution {
+	const disabledValue = (process.env.WORKSHOP_VECTORIZE_DISABLED ?? '')
+		.trim()
+		.toLowerCase()
+	if (
+		disabledValue === '1' ||
+		disabledValue === 'true' ||
+		disabledValue === 'yes'
+	) {
+		return { enabled: false }
+	}
+
 	const configured = config.env?.[environment]?.vectorize?.find(
 		(binding) => binding.binding === 'WORKSHOP_VECTOR_INDEX',
 	)?.index_name
 	if (configured && configured.trim().length > 0) {
-		return configured.trim()
+		return { enabled: true, indexName: configured.trim(), source: 'wrangler' }
 	}
 
 	const envSpecific =
@@ -112,7 +140,15 @@ function resolveVectorizeIndexName({
 		process.env.WORKSHOP_VECTOR_INDEX_NAME
 
 	const resolved = (envSpecific ?? shared ?? '').trim()
-	return resolved.length > 0 ? resolved : undefined
+	if (resolved.length > 0) {
+		return { enabled: true, indexName: resolved, source: 'env' }
+	}
+
+	return {
+		enabled: true,
+		indexName: resolveDefaultVectorizeIndexName({ config, environment }),
+		source: 'default',
+	}
 }
 
 function resolveD1DatabaseId({
@@ -146,7 +182,7 @@ function formatCloudflareErrors(errors: Array<CloudflareApiError> | undefined) {
 		.join('; ')
 }
 
-async function cloudflareRequestJson<T>({
+async function cloudflareFetchEnvelope<T>({
 	apiToken,
 	path,
 	method = 'GET',
@@ -172,6 +208,30 @@ async function cloudflareRequestJson<T>({
 	const payload = (await response
 		.json()
 		.catch(() => null)) as CloudflareApiEnvelope<T> | null
+
+	return { response, payload }
+}
+
+async function cloudflareRequestJson<T>({
+	apiToken,
+	path,
+	method = 'GET',
+	body,
+	headers,
+}: {
+	apiToken: string
+	path: string
+	method?: string
+	body?: unknown
+	headers?: Record<string, string>
+}) {
+	const { response, payload } = await cloudflareFetchEnvelope<T>({
+		apiToken,
+		path,
+		method,
+		body,
+		headers,
+	})
 	if (!payload || typeof payload !== 'object') {
 		throw new Error(
 			`Cloudflare API ${method} ${path} returned a non-JSON response (HTTP ${response.status}).`,
@@ -182,6 +242,11 @@ async function cloudflareRequestJson<T>({
 		const suffix = errorDetails ? `: ${errorDetails}` : ''
 		throw new Error(
 			`Cloudflare API ${method} ${path} failed (HTTP ${response.status})${suffix}`,
+		)
+	}
+	if (typeof payload.result === 'undefined') {
+		throw new Error(
+			`Cloudflare API ${method} ${path} returned no result payload.`,
 		)
 	}
 	return payload.result
@@ -400,6 +465,200 @@ function buildVectorizeClient({
 	} as unknown as Vectorize
 }
 
+function looksLikeAlreadyExistsError(
+	payload: CloudflareApiEnvelope<unknown> | null,
+) {
+	const messages = payload?.errors
+		?.map((error) => (typeof error.message === 'string' ? error.message : ''))
+		.filter(Boolean)
+	const joined = (messages ?? []).join(' ').toLowerCase()
+	return (
+		joined.includes('already exists') ||
+		joined.includes('already present') ||
+		joined.includes('duplicate')
+	)
+}
+
+async function getVectorizeIndex({
+	accountId,
+	apiToken,
+	indexName,
+}: {
+	accountId: string
+	apiToken: string
+	indexName: string
+}) {
+	const path = `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(
+		indexName,
+	)}`
+	const { response, payload } = await cloudflareFetchEnvelope<unknown>({
+		apiToken,
+		path,
+		method: 'GET',
+	})
+	if (response.status === 404) return null
+	if (!payload || typeof payload !== 'object') {
+		throw new Error(
+			`Cloudflare API GET ${path} returned a non-JSON response (HTTP ${response.status}).`,
+		)
+	}
+	if (!response.ok || payload.success !== true) {
+		const errorDetails = formatCloudflareErrors(payload.errors)
+		const suffix = errorDetails ? `: ${errorDetails}` : ''
+		throw new Error(
+			`Cloudflare API GET ${path} failed (HTTP ${response.status})${suffix}`,
+		)
+	}
+	return payload.result ?? null
+}
+
+async function createVectorizeIndex({
+	accountId,
+	apiToken,
+	indexName,
+}: {
+	accountId: string
+	apiToken: string
+	indexName: string
+}) {
+	const path = `/accounts/${accountId}/vectorize/v2/indexes`
+	const { response, payload } = await cloudflareFetchEnvelope<unknown>({
+		apiToken,
+		path,
+		method: 'POST',
+		body: {
+			name: indexName,
+			description: 'epic-agent workshop index (auto-provisioned)',
+			config: {
+				// Matches the embedding model used by workshop indexing + topic search.
+				dimensions: 768,
+				metric: 'cosine',
+			},
+		},
+	})
+
+	if (response.ok && payload?.success === true) return true
+	if (response.status === 409 || looksLikeAlreadyExistsError(payload)) {
+		return false
+	}
+
+	const errorDetails = formatCloudflareErrors(payload?.errors)
+	const suffix = errorDetails ? `: ${errorDetails}` : ''
+	throw new Error(
+		`Cloudflare Vectorize index create failed for "${indexName}" (HTTP ${response.status})${suffix}`,
+	)
+}
+
+async function createVectorizeMetadataIndex({
+	accountId,
+	apiToken,
+	indexName,
+	propertyName,
+	indexType,
+}: {
+	accountId: string
+	apiToken: string
+	indexName: string
+	propertyName: string
+	indexType: 'string' | 'number'
+}) {
+	const path = `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(
+		indexName,
+	)}/metadata_index/create`
+	const { response, payload } = await cloudflareFetchEnvelope<unknown>({
+		apiToken,
+		path,
+		method: 'POST',
+		body: {
+			propertyName,
+			indexType,
+		},
+	})
+
+	if (response.ok && payload?.success === true) return true
+	if (response.status === 409 || looksLikeAlreadyExistsError(payload)) {
+		return false
+	}
+
+	const errorDetails = formatCloudflareErrors(payload?.errors)
+	const suffix = errorDetails ? `: ${errorDetails}` : ''
+	throw new Error(
+		`Cloudflare Vectorize metadata index create failed for "${indexName}" (${propertyName}) (HTTP ${response.status})${suffix}`,
+	)
+}
+
+async function ensureVectorizeIndexReady({
+	accountId,
+	apiToken,
+	indexName,
+	strict,
+}: {
+	accountId: string
+	apiToken: string
+	indexName: string
+	strict: boolean
+}) {
+	try {
+		const existing = await getVectorizeIndex({ accountId, apiToken, indexName })
+		let created = false
+		if (!existing) {
+			created = await createVectorizeIndex({ accountId, apiToken, indexName })
+		}
+
+		// Ensure the index exists now (handles create races/duplicate create calls).
+		const after = await getVectorizeIndex({ accountId, apiToken, indexName })
+		if (!after) {
+			throw new Error(
+				`Vectorize index "${indexName}" still missing after create attempt.`,
+			)
+		}
+
+		const metadataIndices: Array<{
+			propertyName: string
+			indexType: 'string' | 'number'
+		}> = [
+			{ propertyName: 'workshop_slug', indexType: 'string' },
+			{ propertyName: 'exercise_number', indexType: 'number' },
+			{ propertyName: 'step_number', indexType: 'number' },
+			{ propertyName: 'section_order', indexType: 'number' },
+			{ propertyName: 'chunk_index', indexType: 'number' },
+			{ propertyName: 'index_run_id', indexType: 'string' },
+		]
+
+		for (const metadataIndex of metadataIndices) {
+			try {
+				await createVectorizeMetadataIndex({
+					accountId,
+					apiToken,
+					indexName,
+					...metadataIndex,
+				})
+			} catch (error) {
+				if (strict) throw error
+				const message = error instanceof Error ? error.message : String(error)
+				console.warn(
+					'workshop-content-load-vectorize-metadata-index-warning',
+					JSON.stringify({
+						indexName,
+						propertyName: metadataIndex.propertyName,
+						error: message,
+					}),
+				)
+			}
+		}
+
+		return { enabled: true as const, indexName, created }
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		if (strict) throw error
+		console.warn(
+			'workshop-content-load-vectorize-disabled',
+			JSON.stringify({ indexName, error: message }),
+		)
+		return { enabled: false as const, indexName, created: false }
+	}
+}
+
 function buildAiClient({
 	accountId,
 	apiToken,
@@ -475,18 +734,28 @@ async function main() {
 		databaseId: d1DatabaseId,
 	}) as unknown as D1Database
 
-	const vectorizeEnabled = Boolean(vectorizeIndexName)
+	const vectorizeStrict =
+		vectorizeIndexName.enabled && vectorizeIndexName.source !== 'default'
+	const vectorizeSetup = vectorizeIndexName.enabled
+		? await ensureVectorizeIndexReady({
+				accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
+				apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
+				indexName: vectorizeIndexName.indexName,
+				strict: vectorizeStrict,
+			})
+		: { enabled: false as const, indexName: undefined, created: false }
+	const vectorizeEnabled = vectorizeIndexName.enabled && vectorizeSetup.enabled
 	const env: Env = {
 		APP_DB: db,
 		...(process.env.GITHUB_TOKEN
 			? { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
 			: {}),
-		...(vectorizeEnabled && vectorizeIndexName
+		...(vectorizeEnabled && vectorizeSetup.indexName
 			? {
 					WORKSHOP_VECTOR_INDEX: buildVectorizeClient({
 						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
 						apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
-						indexName: vectorizeIndexName,
+						indexName: vectorizeSetup.indexName,
 					}),
 					AI: buildAiClient({
 						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
@@ -539,8 +808,10 @@ async function main() {
 		? onlyWorkshops.join(', ')
 		: 'all discovered workshop repositories'
 	const vectorizeLabel = vectorizeEnabled
-		? `enabled (${vectorizeIndexName})`
-		: 'disabled (no Vectorize index configured)'
+		? `enabled (${vectorizeSetup.indexName})${vectorizeSetup.created ? ' (created)' : ''}`
+		: vectorizeIndexName.enabled
+			? `disabled (${vectorizeIndexName.indexName})`
+			: 'disabled'
 
 	appendStepSummary(
 		[
