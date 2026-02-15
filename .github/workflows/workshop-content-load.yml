@@ -125,14 +125,25 @@ jobs:
           fi
 
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Workshop content load failed with HTTP $HTTP_STATUS" >&2
+            ERROR_MESSAGE=$(printf '%s' "$RESPONSE_BODY" | jq -r '.error // "unknown error"')
+            ERROR_DETAILS=$(printf '%s' "$RESPONSE_BODY" | jq -r '.details // [] | join("; ")')
+            if [ -n "$ERROR_DETAILS" ]; then
+              echo "Workshop content load failed with HTTP $HTTP_STATUS: $ERROR_MESSAGE ($ERROR_DETAILS)" >&2
+            else
+              echo "Workshop content load failed with HTTP $HTTP_STATUS: $ERROR_MESSAGE" >&2
+            fi
             exit 1
           fi
 
           RESPONSE_OK=$(printf '%s' "$RESPONSE_BODY" | jq -r '.ok // false')
           if [ "$RESPONSE_OK" != "true" ]; then
             ERROR_MESSAGE=$(printf '%s' "$RESPONSE_BODY" | jq -r '.error // "unknown error"')
-            echo "Workshop content load reported failure: $ERROR_MESSAGE" >&2
+            ERROR_DETAILS=$(printf '%s' "$RESPONSE_BODY" | jq -r '.details // [] | join("; ")')
+            if [ -n "$ERROR_DETAILS" ]; then
+              echo "Workshop content load reported failure: $ERROR_MESSAGE ($ERROR_DETAILS)" >&2
+            else
+              echo "Workshop content load reported failure: $ERROR_MESSAGE" >&2
+            fi
             exit 1
           fi
 

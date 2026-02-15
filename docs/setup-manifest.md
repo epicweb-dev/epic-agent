@@ -96,6 +96,8 @@ To load workshop content into D1 + Vectorize from CI, run the
 - reindex HTTP calls use connect/request timeouts to avoid hanging CI jobs
 - the workflow expects a successful JSON response (`ok: true`) from the reindex
   endpoint and fails fast otherwise
+- when the reindex endpoint returns an error JSON payload, the workflow surfaces
+  both `error` and joined `details` fields in job logs for faster diagnosis
 - workflow summary output includes the returned reindex run id for easier log
   correlation (`workshop_index_runs.id`)
 
