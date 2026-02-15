@@ -75,7 +75,9 @@ function oversizedReindexPayloadResponse(details: Array<string>) {
 function parseRequestContentLength(request: Request) {
 	const contentLengthHeader = request.headers.get('Content-Length')
 	if (!contentLengthHeader) return undefined
-	const parsed = Number.parseInt(contentLengthHeader, 10)
+	const trimmedHeader = contentLengthHeader.trim()
+	if (!/^\d+$/.test(trimmedHeader)) return undefined
+	const parsed = Number.parseInt(trimmedHeader, 10)
 	if (!Number.isFinite(parsed) || parsed < 0) return undefined
 	return parsed
 }

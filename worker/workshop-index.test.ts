@@ -181,6 +181,38 @@ test('workshop index route rejects oversized content-length header values', asyn
 	})
 })
 
+test('workshop index route ignores malformed content-length headers', async () => {
+	let reindexCalled = false
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+				'Content-Length': `${workshopIndexRequestBodyMaxChars + 1}abc`,
+			},
+			body: '{}',
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				reindexCalled = true
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(reindexCalled).toBe(true)
+})
+
 test('workshop index route rejects oversized workshop filters', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
