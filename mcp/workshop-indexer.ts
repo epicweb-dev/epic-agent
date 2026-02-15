@@ -10,6 +10,7 @@ import {
 	type IndexedStepWrite,
 	type IndexedWorkshopWrite,
 } from './workshop-data.ts'
+import { workshopIndexBatchMaxSize } from '../shared/workshop-index-constants.ts'
 
 type WorkshopRepository = {
 	owner: string
@@ -68,7 +69,6 @@ const vectorDeleteBatchSize = 500
 const githubRequestMaxAttempts = 3
 const githubRetryBaseDelayMs = 500
 const githubRetryMaxDelayMs = 30_000
-const workshopReindexMaxBatchSize = 20
 
 type ReindexCursor = {
 	offset: number
@@ -110,10 +110,7 @@ function resolveReindexRepositoryBatch({
 	const offset = decodedCursor.offset
 	const limit =
 		typeof batchSize === 'number' && Number.isFinite(batchSize)
-			? Math.min(
-					workshopReindexMaxBatchSize,
-					Math.max(1, Math.floor(batchSize)),
-				)
+			? Math.min(workshopIndexBatchMaxSize, Math.max(1, Math.floor(batchSize)))
 			: repositories.length
 
 	const batch = repositories.slice(offset, offset + limit)

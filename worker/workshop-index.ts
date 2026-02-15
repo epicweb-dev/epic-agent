@@ -5,13 +5,20 @@ import {
 } from '../mcp/workshop-indexer.ts'
 import {
 	workshopFilterMaxCount,
+	workshopIndexBatchMaxSize,
 	workshopIndexRequestBodyMaxChars,
 } from '../shared/workshop-index-constants.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
-export { workshopFilterMaxCount, workshopIndexRequestBodyMaxChars }
+export {
+	workshopFilterMaxCount,
+	workshopIndexBatchMaxSize,
+	workshopIndexRequestBodyMaxChars,
+}
 const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
 const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
+const batchSizeMaxErrorMessage = `batchSize must be at most ${workshopIndexBatchMaxSize}.`
+const batchSizeMinErrorMessage = 'batchSize must be at least 1.'
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
@@ -26,7 +33,12 @@ const reindexBodySchema = z.object({
 		}, workshopFilterSchema)
 		.optional(),
 	cursor: z.string().trim().min(1).optional(),
-	batchSize: z.number().int().min(1).max(20).optional(),
+	batchSize: z
+		.number()
+		.int()
+		.min(1, { message: batchSizeMinErrorMessage })
+		.max(workshopIndexBatchMaxSize, { message: batchSizeMaxErrorMessage })
+		.optional(),
 })
 
 function normalizeWorkshops(workshops: Array<string> | undefined) {

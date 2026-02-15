@@ -4,6 +4,7 @@ import { WorkshopIndexInputError } from '../mcp/workshop-indexer.ts'
 import {
 	handleWorkshopIndexRequest,
 	workshopFilterMaxCount,
+	workshopIndexBatchMaxSize,
 	workshopIndexRequestBodyMaxChars,
 	workshopIndexRoutePath,
 } from './workshop-index.ts'
@@ -17,6 +18,8 @@ function createEnv(overrides: Partial<Env> = {}) {
 
 const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
 const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
+const batchSizeMaxErrorMessage = `batchSize must be at most ${workshopIndexBatchMaxSize}.`
+const batchSizeMinErrorMessage = 'batchSize must be at least 1.'
 
 test('workshop index route rejects non-POST methods', async () => {
 	const response = await handleWorkshopIndexRequest(
@@ -491,6 +494,54 @@ test('workshop index route forwards cursor and batch size to indexer', async () 
 		sectionCount: 0,
 		sectionChunkCount: 0,
 		nextCursor: 'next-cursor',
+	})
+})
+
+test('workshop index route rejects batch sizes above the max', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				batchSize: workshopIndexBatchMaxSize + 1,
+			}),
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: [batchSizeMaxErrorMessage],
+	})
+})
+
+test('workshop index route rejects batch sizes below 1', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				batchSize: 0,
+			}),
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Invalid reindex payload.',
+		details: [batchSizeMinErrorMessage],
 	})
 })
 

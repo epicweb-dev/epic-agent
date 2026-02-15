@@ -53,7 +53,14 @@ Local development uses `.env`, which Wrangler loads automatically:
 Manual reindex endpoint:
 
 - `POST /internal/workshop-index/reindex`
-- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>`
+- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
+  case-insensitive)
+
+The reindex endpoint also supports cursor batching to reduce the risk of
+long-running requests:
+
+- request fields: `cursor` and `batchSize` (1-20)
+- response field: `nextCursor` (present when more workshops remain)
 
 Tests use `.env.test` when `CLOUDFLARE_ENV=test` (set by Playwright).
 
