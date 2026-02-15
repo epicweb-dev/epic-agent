@@ -81,6 +81,7 @@ To load workshop content into D1 + Vectorize from CI, run the
 - optionally provide a comma-separated workshop list to limit indexing scope
 - leave the workshop list empty to index all discovered workshop repositories
 - workshop slugs are trimmed and deduplicated before sending the reindex payload
+- workshop filters are capped at 100 unique slugs after normalization
 - if the provided workshop list collapses to empty after trimming/deduping, the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, reindex fails fast with an explicit
