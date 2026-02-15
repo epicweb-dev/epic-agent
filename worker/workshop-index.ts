@@ -72,6 +72,14 @@ function oversizedReindexPayloadResponse(details: Array<string>) {
 	)
 }
 
+function parseRequestContentLength(request: Request) {
+	const contentLengthHeader = request.headers.get('Content-Length')
+	if (!contentLengthHeader) return undefined
+	const parsed = Number.parseInt(contentLengthHeader, 10)
+	if (!Number.isFinite(parsed) || parsed < 0) return undefined
+	return parsed
+}
+
 function getBearerToken(request: Request) {
 	const header = request.headers.get('Authorization')
 	if (!header || !header.startsWith('Bearer ')) return null
@@ -104,6 +112,13 @@ export async function handleWorkshopIndexRequest(
 	const token = getBearerToken(request)
 	if (!token || token !== configuredToken) {
 		return unauthorizedResponse()
+	}
+	const contentLength = parseRequestContentLength(request)
+	if (
+		typeof contentLength === 'number' &&
+		contentLength > workshopIndexRequestBodyMaxChars
+	) {
+		return oversizedReindexPayloadResponse([requestBodyMaxErrorMessage])
 	}
 
 	let body: unknown = {}
