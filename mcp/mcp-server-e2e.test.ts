@@ -1149,6 +1149,41 @@ networkTest(
 )
 
 networkTest(
+	'manual reindex endpoint normalizes and sorts unknown workshop filter errors',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					workshops: ['Z-WORKSHOP', 'a-workshop'],
+				}),
+			},
+		)
+
+		expect(response.status).toBe(400)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+			details?: Array<string>
+		}
+		expect(payload.ok).toBe(false)
+		expect(payload.error).toBe('Invalid reindex payload.')
+		expect(payload.details).toEqual([
+			'Unknown workshop filter(s): a-workshop, z-workshop.',
+		])
+	},
+	{ timeout: indexingTimeoutMs },
+)
+
+networkTest(
 	'manual reindex endpoint indexes real workshop data for retrieval tools',
 	async () => {
 		await using database = await createTestDatabase()
