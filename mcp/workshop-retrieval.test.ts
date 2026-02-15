@@ -1,6 +1,9 @@
 /// <reference types="bun" />
 import { expect, test } from 'bun:test'
-import { searchTopicContext } from './workshop-retrieval.ts'
+import {
+	retrieveDiffContext,
+	searchTopicContext,
+} from './workshop-retrieval.ts'
 import { topicSearchMaxLimit } from './workshop-contracts.ts'
 
 type MockQueryMatch = {
@@ -8,8 +11,20 @@ type MockQueryMatch = {
 	score: number
 }
 
+type MockSectionRow = {
+	workshop_slug: string
+	label: string
+	section_kind: string
+	content: string
+	source_path?: string | null
+	exercise_number?: number | null
+	step_number?: number | null
+	is_diff?: number
+}
+
 function createMockDb({
 	rowsByVectorId,
+	sectionRows = [],
 	workshops = [],
 	workshopExercises = {},
 	globalExercises = [],
@@ -28,6 +43,7 @@ function createMockDb({
 			source_path?: string | null
 		}
 	>
+	sectionRows?: Array<MockSectionRow>
 	workshops?: Array<string>
 	workshopExercises?: Record<string, Array<number>>
 	globalExercises?: Array<number>
@@ -104,6 +120,49 @@ function createMockDb({
 								async first() {
 									const key = `${exerciseNumber}:${stepNumber}`
 									return globalSteps[key] ? { step_number: stepNumber } : null
+								},
+							}
+						},
+					}
+				}
+				if (query.includes('FROM indexed_sections')) {
+					return {
+						bind(...scopeArgs: Array<string | number>) {
+							return {
+								async all() {
+									const [workshop, exerciseNumber, stepNumber] = scopeArgs
+									const isDiffOnly = query.includes('is_diff = 1')
+									const filtered = sectionRows.filter((row) => {
+										if (row.workshop_slug !== workshop) return false
+										if (
+											typeof exerciseNumber === 'number' &&
+											row.exercise_number !== null &&
+											row.exercise_number !== undefined &&
+											row.exercise_number !== exerciseNumber
+										) {
+											return false
+										}
+										if (
+											typeof stepNumber === 'number' &&
+											row.step_number !== null &&
+											row.step_number !== undefined &&
+											row.step_number !== stepNumber
+										) {
+											return false
+										}
+										if (isDiffOnly && row.is_diff !== 1) return false
+										return true
+									})
+									return {
+										results: filtered.map((row) => ({
+											label: row.label,
+											section_kind: row.section_kind,
+											content: row.content,
+											source_path: row.source_path ?? null,
+											exercise_number: row.exercise_number ?? null,
+											step_number: row.step_number ?? null,
+										})),
+									}
 								},
 							}
 						},
@@ -509,4 +568,60 @@ test('searchTopicContext clamps limit to shared max', async () => {
 
 	expect(observedTopK).toBe(topicSearchMaxLimit)
 	expect(result.limit).toBe(topicSearchMaxLimit)
+})
+
+test('retrieveDiffContext includes trimmed focus and step scope in no-match errors', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [1] },
+		workshopSteps: { 'mcp-fundamentals': ['1:1'] },
+		sectionRows: [
+			{
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'diff-hunk',
+				label: 'Diff hunk',
+				content: 'diff --git a/src/index.ts b/src/index.ts',
+				source_path: 'src/index.ts',
+				is_diff: 1,
+			},
+		],
+	})
+	const env = { APP_DB: db } as unknown as Env
+
+	await expect(
+		retrieveDiffContext({
+			env,
+			workshop: 'mcp-fundamentals',
+			exerciseNumber: 1,
+			stepNumber: 1,
+			focus: '   no-such-file   ',
+		}),
+	).rejects.toThrow(
+		'No diff context matched focus "no-such-file" for workshop "mcp-fundamentals" exercise 1 step 1.',
+	)
+})
+
+test('retrieveDiffContext includes step scope when diff sections are missing', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [1] },
+		workshopSteps: { 'mcp-fundamentals': ['1:1'] },
+		sectionRows: [],
+	})
+	const env = { APP_DB: db } as unknown as Env
+
+	await expect(
+		retrieveDiffContext({
+			env,
+			workshop: 'mcp-fundamentals',
+			exerciseNumber: 1,
+			stepNumber: 1,
+		}),
+	).rejects.toThrow(
+		'No diff context found for workshop "mcp-fundamentals" exercise 1 step 1.',
+	)
 })
