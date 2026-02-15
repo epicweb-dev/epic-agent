@@ -169,19 +169,22 @@ export async function listIndexedWorkshops({
 		product: row.product ?? undefined,
 	}))
 
-	const countQuery = `
-		SELECT COUNT(*) AS total
-		FROM indexed_workshops
-		${whereSql}
-	`
-	const countResult = await db
-		.prepare(countQuery)
-		.bind(...params)
-		.first<{ total?: number }>()
-	const total = Number(countResult?.total ?? 0)
 	const nextOffset = pagination.offset + workshops.length
-	const nextCursor =
-		nextOffset < total ? encodeCursor({ offset: nextOffset }) : null
+	let nextCursor: string | null = null
+	if (workshops.length >= limit) {
+		const countQuery = `
+			SELECT COUNT(*) AS total
+			FROM indexed_workshops
+			${whereSql}
+		`
+		const countResult = await db
+			.prepare(countQuery)
+			.bind(...params)
+			.first<{ total?: number }>()
+		const total = Number(countResult?.total ?? 0)
+		nextCursor =
+			nextOffset < total ? encodeCursor({ offset: nextOffset }) : null
+	}
 
 	return { workshops, nextCursor }
 }
