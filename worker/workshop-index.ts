@@ -3,7 +3,9 @@ import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
 export const workshopFilterMaxCount = 100
+export const workshopIndexRequestBodyMaxChars = 50_000
 const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
+const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
@@ -59,6 +61,17 @@ function invalidReindexPayloadResponse(details: Array<string>) {
 	)
 }
 
+function oversizedReindexPayloadResponse(details: Array<string>) {
+	return Response.json(
+		{
+			ok: false,
+			error: 'Reindex payload is too large.',
+			details,
+		},
+		{ status: 413 },
+	)
+}
+
 function getBearerToken(request: Request) {
 	const header = request.headers.get('Authorization')
 	if (!header || !header.startsWith('Bearer ')) return null
@@ -95,6 +108,9 @@ export async function handleWorkshopIndexRequest(
 
 	let body: unknown = {}
 	const requestBody = await request.text()
+	if (requestBody.length > workshopIndexRequestBodyMaxChars) {
+		return oversizedReindexPayloadResponse([requestBodyMaxErrorMessage])
+	}
 	if (requestBody.trim().length > 0) {
 		try {
 			body = JSON.parse(requestBody) as unknown

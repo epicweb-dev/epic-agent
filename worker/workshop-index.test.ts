@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import {
 	handleWorkshopIndexRequest,
 	workshopFilterMaxCount,
+	workshopIndexRequestBodyMaxChars,
 	workshopIndexRoutePath,
 } from './workshop-index.ts'
 
@@ -14,6 +15,7 @@ function createEnv(overrides: Partial<Env> = {}) {
 }
 
 const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
+const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
 
 test('workshop index route rejects non-POST methods', async () => {
 	const response = await handleWorkshopIndexRequest(
@@ -101,6 +103,43 @@ test('workshop index route rejects malformed json payloads', async () => {
 		ok: false,
 		error: 'Invalid reindex payload.',
 		details: ['Request body must be valid JSON.'],
+	})
+})
+
+test('workshop index route rejects oversized request bodies', async () => {
+	let reindexCalled = false
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: 'x'.repeat(workshopIndexRequestBodyMaxChars + 1),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async () => {
+				reindexCalled = true
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(413)
+	expect(reindexCalled).toBe(false)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: 'Reindex payload is too large.',
+		details: [requestBodyMaxErrorMessage],
 	})
 })
 

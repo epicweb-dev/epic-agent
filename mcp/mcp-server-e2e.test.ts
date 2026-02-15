@@ -25,6 +25,7 @@ const bunBin = process.execPath
 const defaultTimeoutMs = 60_000
 const indexingTimeoutMs = 240_000
 const testWorkshopIndexAdminToken = 'test-workshop-index-token'
+const testWorkshopIndexRequestBodyMaxChars = 50_000
 const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
 const runtimeGitHubToken = resolveRuntimeGitHubToken()
 const runWorkshopNetworkReindexTest =
@@ -1070,6 +1071,41 @@ test(
 			ok: false,
 			error: 'Invalid reindex payload.',
 			details: ['Request body must be valid JSON.'],
+		})
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'manual reindex endpoint rejects oversized payloads',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
+					'Content-Type': 'application/json',
+				},
+				body: 'x'.repeat(testWorkshopIndexRequestBodyMaxChars + 1),
+			},
+		)
+
+		expect(response.status).toBe(413)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+			details?: Array<string>
+		}
+		expect(payload).toEqual({
+			ok: false,
+			error: 'Reindex payload is too large.',
+			details: [
+				`Request body must be at most ${testWorkshopIndexRequestBodyMaxChars} characters.`,
+			],
 		})
 	},
 	{ timeout: defaultTimeoutMs },
