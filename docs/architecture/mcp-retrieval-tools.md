@@ -91,26 +91,31 @@ If bindings are missing, the tool returns an explicit unavailability error.
 
 ## Manual indexing trigger
 
-Indexing is manual-only and handled outside MCP tool calls via:
+Indexing is handled outside MCP tool calls.
+
+Recommended (CI):
+
+- Run the `🧠 Load Workshop Content` GitHub Actions workflow, which executes
+  `bun run workshop-content-load` and indexes directly into D1 (and Vectorize
+  when configured) using Cloudflare APIs.
+
+Optional (deployed Worker endpoint):
 
 - `POST /internal/workshop-index/reindex`
 - `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
   case-insensitive)
 
-This route refreshes indexed workshop metadata, sections, and optional vector
-chunks used by retrieval tools. Optional `workshops` filters may be sent as an
-array or as a comma/newline-delimited string; values are trimmed, lowercased,
-and deduplicated server-side. Empty lists fall back to full discovery-based
-reindex. For operational safety, the route accepts at most 100 workshop filters
-after normalization (trim/lowercase/dedupe). If any requested workshop slug is
-unknown, the request fails with a `400` invalid-payload response and explicit
-details. The route also rejects malformed JSON payloads with `400` instead of
-silently defaulting to full reindex behavior. The route also enforces a maximum
-request body size (50,000 characters), including an early `Content-Length` guard
-when present, and returns `413` when exceeded. The `🧠 Load Workshop Content`
-workflow mirrors these guardrails by lowercasing/normalizing filters, failing
-fast if more than 100 unique workshop slugs are provided, and pre-checking the
-serialized payload size before it calls the route.
+The reindex route refreshes indexed workshop metadata, sections, and optional
+vector chunks used by retrieval tools. Optional `workshops` filters may be sent
+as an array or as a comma/newline-delimited string; values are trimmed,
+lowercased, and deduplicated server-side. Empty lists fall back to full
+discovery-based reindex. For operational safety, the route accepts at most 100
+workshop filters after normalization (trim/lowercase/dedupe). If any requested
+workshop slug is unknown, the request fails with a `400` invalid-payload
+response and explicit details. The route also rejects malformed JSON payloads
+with `400` instead of silently defaulting to full reindex behavior. The route
+enforces a maximum request body size (50,000 characters), including an early
+`Content-Length` guard when present, and returns `413` when exceeded.
 
 To avoid long-running request timeouts, the reindex route also supports optional
 pagination:

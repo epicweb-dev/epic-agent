@@ -90,26 +90,23 @@ async function clearWorkshopIndexScope({
 	db: D1Database
 	workshopSlug: string
 }) {
-	await db
-		.prepare(`DELETE FROM indexed_sections WHERE workshop_slug = ?`)
-		.bind(workshopSlug)
-		.run()
-	await db
-		.prepare(`DELETE FROM indexed_section_chunks WHERE workshop_slug = ?`)
-		.bind(workshopSlug)
-		.run()
-	await db
-		.prepare(`DELETE FROM indexed_steps WHERE workshop_slug = ?`)
-		.bind(workshopSlug)
-		.run()
-	await db
-		.prepare(`DELETE FROM indexed_exercises WHERE workshop_slug = ?`)
-		.bind(workshopSlug)
-		.run()
-	await db
-		.prepare(`DELETE FROM indexed_workshops WHERE workshop_slug = ?`)
-		.bind(workshopSlug)
-		.run()
+	await db.batch([
+		db
+			.prepare(`DELETE FROM indexed_sections WHERE workshop_slug = ?`)
+			.bind(workshopSlug),
+		db
+			.prepare(`DELETE FROM indexed_section_chunks WHERE workshop_slug = ?`)
+			.bind(workshopSlug),
+		db
+			.prepare(`DELETE FROM indexed_steps WHERE workshop_slug = ?`)
+			.bind(workshopSlug),
+		db
+			.prepare(`DELETE FROM indexed_exercises WHERE workshop_slug = ?`)
+			.bind(workshopSlug),
+		db
+			.prepare(`DELETE FROM indexed_workshops WHERE workshop_slug = ?`)
+			.bind(workshopSlug),
+	])
 }
 
 function encodeCursor(cursor: PaginationCursor) {
@@ -399,9 +396,10 @@ export async function replaceWorkshopIndex({
 			workshopSlug: workshop.workshopSlug,
 		})
 
-		await db
-			.prepare(
-				`
+		const statements: Array<D1PreparedStatement> = [
+			db
+				.prepare(
+					`
 			INSERT INTO indexed_workshops (
 				workshop_slug,
 				title,
@@ -416,26 +414,27 @@ export async function replaceWorkshopIndex({
 				index_run_id
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
-			)
-			.bind(
-				workshop.workshopSlug,
-				workshop.title,
-				workshop.product ?? null,
-				workshop.repoOwner,
-				workshop.repoName,
-				workshop.defaultBranch,
-				workshop.sourceSha,
-				workshop.exerciseCount,
-				workshop.hasDiffs ? 1 : 0,
-				new Date().toISOString(),
-				runId,
-			)
-			.run()
+				)
+				.bind(
+					workshop.workshopSlug,
+					workshop.title,
+					workshop.product ?? null,
+					workshop.repoOwner,
+					workshop.repoName,
+					workshop.defaultBranch,
+					workshop.sourceSha,
+					workshop.exerciseCount,
+					workshop.hasDiffs ? 1 : 0,
+					new Date().toISOString(),
+					runId,
+				),
+		]
 
 		for (const exercise of exercises) {
-			await db
-				.prepare(
-					`
+			statements.push(
+				db
+					.prepare(
+						`
 				INSERT INTO indexed_exercises (
 					workshop_slug,
 					exercise_number,
@@ -443,20 +442,21 @@ export async function replaceWorkshopIndex({
 					step_count
 				) VALUES (?, ?, ?, ?)
 			`,
-				)
-				.bind(
-					workshop.workshopSlug,
-					exercise.exerciseNumber,
-					exercise.title,
-					exercise.stepCount,
-				)
-				.run()
+					)
+					.bind(
+						workshop.workshopSlug,
+						exercise.exerciseNumber,
+						exercise.title,
+						exercise.stepCount,
+					),
+			)
 		}
 
 		for (const step of steps) {
-			await db
-				.prepare(
-					`
+			statements.push(
+				db
+					.prepare(
+						`
 				INSERT INTO indexed_steps (
 					workshop_slug,
 					exercise_number,
@@ -466,22 +466,23 @@ export async function replaceWorkshopIndex({
 					has_diff
 				) VALUES (?, ?, ?, ?, ?, ?)
 			`,
-				)
-				.bind(
-					workshop.workshopSlug,
-					step.exerciseNumber,
-					step.stepNumber,
-					step.problemDir ?? null,
-					step.solutionDir ?? null,
-					step.hasDiff ? 1 : 0,
-				)
-				.run()
+					)
+					.bind(
+						workshop.workshopSlug,
+						step.exerciseNumber,
+						step.stepNumber,
+						step.problemDir ?? null,
+						step.solutionDir ?? null,
+						step.hasDiff ? 1 : 0,
+					),
+			)
 		}
 
 		for (const section of sections) {
-			await db
-				.prepare(
-					`
+			statements.push(
+				db
+					.prepare(
+						`
 				INSERT INTO indexed_sections (
 					workshop_slug,
 					exercise_number,
@@ -496,27 +497,28 @@ export async function replaceWorkshopIndex({
 					index_run_id
 				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`,
-				)
-				.bind(
-					workshop.workshopSlug,
-					section.exerciseNumber ?? null,
-					section.stepNumber ?? null,
-					section.sectionOrder,
-					section.sectionKind,
-					section.label,
-					section.sourcePath ?? null,
-					section.content,
-					section.content.length,
-					section.isDiff ? 1 : 0,
-					runId,
-				)
-				.run()
+					)
+					.bind(
+						workshop.workshopSlug,
+						section.exerciseNumber ?? null,
+						section.stepNumber ?? null,
+						section.sectionOrder,
+						section.sectionKind,
+						section.label,
+						section.sourcePath ?? null,
+						section.content,
+						section.content.length,
+						section.isDiff ? 1 : 0,
+						runId,
+					),
+			)
 		}
 
 		for (const sectionChunk of sectionChunks) {
-			await db
-				.prepare(
-					`
+			statements.push(
+				db
+					.prepare(
+						`
 				INSERT INTO indexed_section_chunks (
 					workshop_slug,
 					exercise_number,
@@ -529,19 +531,24 @@ export async function replaceWorkshopIndex({
 					index_run_id
 				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`,
-				)
-				.bind(
-					workshop.workshopSlug,
-					sectionChunk.exerciseNumber ?? null,
-					sectionChunk.stepNumber ?? null,
-					sectionChunk.sectionOrder,
-					sectionChunk.chunkIndex,
-					sectionChunk.content,
-					sectionChunk.content.length,
-					sectionChunk.vectorId ?? null,
-					runId,
-				)
-				.run()
+					)
+					.bind(
+						workshop.workshopSlug,
+						sectionChunk.exerciseNumber ?? null,
+						sectionChunk.stepNumber ?? null,
+						sectionChunk.sectionOrder,
+						sectionChunk.chunkIndex,
+						sectionChunk.content,
+						sectionChunk.content.length,
+						sectionChunk.vectorId ?? null,
+						runId,
+					),
+			)
+		}
+
+		const batchSize = 100
+		for (let index = 0; index < statements.length; index += batchSize) {
+			await db.batch(statements.slice(index, index + batchSize))
 		}
 	} catch (error) {
 		const originalMessage =

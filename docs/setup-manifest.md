@@ -76,8 +76,14 @@ Configure these secrets for deploy workflows:
 - `APP_BASE_URL` (production base URL)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
-- `GITHUB_TOKEN` (optional, recommended for indexing throughput)
-- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)
+- `GITHUB_TOKEN` (optional, recommended for indexing throughput and/or indexing
+  private workshop repos; defaults to the GitHub Actions token when absent)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (optional; only required if you still want to
+  call the protected manual reindex endpoint on the deployed Worker)
+- `WORKSHOP_VECTORIZE_INDEX_NAME` (optional; enables Vectorize upserts during CI
+  indexing in production)
+- `WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW` (optional; enables Vectorize upserts
+  during CI indexing in preview)
 
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 
@@ -93,37 +99,22 @@ To load workshop content into D1 + Vectorize from CI, run the
 - optionally provide a comma/newline-separated workshop list to limit indexing
   scope
 - leave the workshop list empty to index all discovered workshop repositories
-- workshop slugs are trimmed, lowercased, and deduplicated before sending the
-  reindex payload
+- workshop slugs are trimmed, lowercased, and deduplicated before indexing
 - workshop filters are capped at 100 unique slugs after normalization
-- normalized reindex payloads must remain within the route body-size limit
-  (50,000 characters)
 - if the provided workshop list collapses to empty after trimming/deduping, the
   workflow falls back to indexing all discovered workshop repositories
-- if any requested workshop slug is unknown, reindex fails fast with an explicit
-  `400` response naming missing workshops
-- the workflow resolves a target base URL in this order:
-  - preferred: the environment-specific `workers.dev` URL derived from
-    `wrangler.jsonc` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`)
-  - fallback (production only): `APP_BASE_URL`
-- target URLs must be absolute `http://` or `https://` base URLs
-- before indexing, the workflow preflights
-  `POST /internal/workshop-index/reindex` without `Authorization`:
-  - `401` means the Worker has `WORKSHOP_INDEX_ADMIN_TOKEN` configured
-    (expected)
-  - `503` means the Worker is missing `WORKSHOP_INDEX_ADMIN_TOKEN`
-- the workflow retries transient network failures when calling the protected
-  reindex endpoint
-- reindex HTTP calls use connect/request timeouts to avoid hanging CI jobs
-- the workflow paginates reindex requests when needed:
-  - it sets `batchSize` (default 5, max 20)
-  - it continues calling the route while `nextCursor` is returned
-- the workflow expects a successful JSON response (`ok: true`) from the reindex
-  endpoint and fails fast otherwise
-- when the reindex endpoint returns an error JSON payload, the workflow surfaces
-  both `error` and `details` fields in job logs for faster diagnosis (whether
-  `details` is returned as an array or a string)
-- workflow summary output includes the returned reindex run ids for easier log
+- if any requested workshop slug is unknown, indexing fails fast with an
+  explicit error naming missing workshops
+- the workflow runs `bun run workshop-content-load`, which:
+  - reads `wrangler.jsonc` to locate the environment-specific `APP_DB` database
+    id
+  - indexes workshops directly into D1 using the Cloudflare D1 API
+  - when `WORKSHOP_VECTORIZE_INDEX_NAME` (or preview equivalent) is configured,
+    generates embeddings via the Workers AI API and upserts vectors into the
+    configured Vectorize index
+  - paginates over workshop repositories using `batchSize` (default 5, max 20)
+    until all workshops are processed
+- workflow summary output includes the generated reindex run ids for easier log
   correlation (`workshop_index_runs.id`)
 
 When PR preview deploys run, CI deploys a unique Worker per PR named
