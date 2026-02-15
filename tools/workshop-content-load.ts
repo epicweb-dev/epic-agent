@@ -322,7 +322,7 @@ class RemoteD1PreparedStatement {
 	}
 }
 
-class RemoteD1Database {
+export class RemoteD1Database {
 	#accountId: string
 	#apiToken: string
 	#databaseId: string
@@ -349,6 +349,7 @@ class RemoteD1Database {
 	}
 
 	async batch<T = unknown>(statements: Array<D1PreparedStatement>) {
+		if (statements.length === 0) return []
 		const queries = statements.map((statement) => {
 			if (statement instanceof RemoteD1PreparedStatement) {
 				return statement.toQuery()
@@ -363,7 +364,9 @@ class RemoteD1Database {
 			apiToken: this.#apiToken,
 			path,
 			method: 'POST',
-			body: queries,
+			// Cloudflare's D1 REST API expects an object body, even when running a
+			// batch of statements.
+			body: { queries },
 		})
 		for (const [index, entry] of result.entries()) {
 			if (entry?.success === true) continue
@@ -860,8 +863,10 @@ async function main() {
 	)
 }
 
-main().catch((error) => {
-	const message = error instanceof Error ? error.message : String(error)
-	console.error(message)
-	process.exitCode = 1
-})
+if (import.meta.main) {
+	main().catch((error) => {
+		const message = error instanceof Error ? error.message : String(error)
+		console.error(message)
+		process.exitCode = 1
+	})
+}
