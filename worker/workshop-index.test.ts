@@ -2,6 +2,7 @@
 import { expect, test } from 'bun:test'
 import {
 	handleWorkshopIndexRequest,
+	workshopFilterMaxCount,
 	workshopIndexRoutePath,
 } from './workshop-index.ts'
 
@@ -74,7 +75,7 @@ test('workshop index route rejects oversized workshop filters', async () => {
 			},
 			body: JSON.stringify({
 				workshops: Array.from(
-					{ length: 101 },
+					{ length: workshopFilterMaxCount + 1 },
 					(_, index) => `workshop-${index}`,
 				),
 			}),
@@ -101,7 +102,7 @@ test('workshop index route rejects oversized string workshop filters', async () 
 			},
 			body: JSON.stringify({
 				workshops: Array.from(
-					{ length: 101 },
+					{ length: workshopFilterMaxCount + 1 },
 					(_, index) => `workshop-${index}`,
 				).join(','),
 			}),
@@ -128,7 +129,10 @@ test('workshop index route allows oversized duplicate workshop filters after nor
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				workshops: Array.from({ length: 101 }, () => 'MCP-FUNDAMENTALS'),
+				workshops: Array.from(
+					{ length: workshopFilterMaxCount + 1 },
+					() => 'MCP-FUNDAMENTALS',
+				),
 			}),
 		}),
 		createEnv(),

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
-const maxWorkshopFilters = 100
+export const workshopFilterMaxCount = 100
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
@@ -108,7 +108,10 @@ export async function handleWorkshopIndexRequest(
 	const runWorkshopReindexFn =
 		options.runWorkshopReindexFn ?? runWorkshopReindex
 	const normalizedWorkshops = normalizeWorkshops(parsedBody.data.workshops)
-	if (normalizedWorkshops && normalizedWorkshops.length > maxWorkshopFilters) {
+	if (
+		normalizedWorkshops &&
+		normalizedWorkshops.length > workshopFilterMaxCount
+	) {
 		return invalidReindexPayloadResponse([
 			'workshops must include at most 100 entries.',
 		])
