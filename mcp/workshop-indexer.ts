@@ -389,6 +389,96 @@ function shouldIgnoreDiffPath(path: string, ignorePatterns: Array<string>) {
 	return ignorePatterns.some((pattern) => wildcardToRegExp(pattern).test(path))
 }
 
+function buildLineIndexMap(lines: Array<string>) {
+	const indexMap = new Map<string, Array<number>>()
+	for (const [index, line] of lines.entries()) {
+		const matches = indexMap.get(line) ?? []
+		matches.push(index)
+		indexMap.set(line, matches)
+	}
+	return indexMap
+}
+
+function findNextLineIndex(
+	lineIndices: Array<number> | undefined,
+	currentIndex: number,
+) {
+	if (!lineIndices || lineIndices.length === 0) return -1
+	let low = 0
+	let high = lineIndices.length
+	while (low < high) {
+		const mid = Math.floor((low + high) / 2)
+		const midValue = lineIndices[mid] ?? -1
+		if (midValue <= currentIndex) {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+	const nextValue = lineIndices[low]
+	return typeof nextValue === 'number' ? nextValue : -1
+}
+
+function buildDiffLines({
+	oldLines,
+	newLines,
+}: {
+	oldLines: Array<string>
+	newLines: Array<string>
+}) {
+	const oldIndexMap = buildLineIndexMap(oldLines)
+	const newIndexMap = buildLineIndexMap(newLines)
+	const diffLines: Array<string> = []
+	let oldIndex = 0
+	let newIndex = 0
+
+	while (oldIndex < oldLines.length && newIndex < newLines.length) {
+		const oldLine = oldLines[oldIndex] ?? ''
+		const newLine = newLines[newIndex] ?? ''
+		if (oldLine === newLine) {
+			diffLines.push(` ${oldLine}`)
+			oldIndex += 1
+			newIndex += 1
+			continue
+		}
+
+		const nextOldInNew = findNextLineIndex(newIndexMap.get(oldLine), newIndex)
+		const nextNewInOld = findNextLineIndex(oldIndexMap.get(newLine), oldIndex)
+
+		if (nextOldInNew === -1 && nextNewInOld === -1) {
+			diffLines.push(`-${oldLine}`)
+			diffLines.push(`+${newLine}`)
+			oldIndex += 1
+			newIndex += 1
+			continue
+		}
+
+		if (
+			nextOldInNew !== -1 &&
+			(nextNewInOld === -1 ||
+				nextOldInNew - newIndex <= nextNewInOld - oldIndex)
+		) {
+			diffLines.push(`+${newLine}`)
+			newIndex += 1
+			continue
+		}
+
+		diffLines.push(`-${oldLine}`)
+		oldIndex += 1
+	}
+
+	while (oldIndex < oldLines.length) {
+		diffLines.push(`-${oldLines[oldIndex]}`)
+		oldIndex += 1
+	}
+	while (newIndex < newLines.length) {
+		diffLines.push(`+${newLines[newIndex]}`)
+		newIndex += 1
+	}
+
+	return diffLines
+}
+
 function createSimpleUnifiedDiff({
 	path,
 	problemContent,
@@ -406,7 +496,6 @@ function createSimpleUnifiedDiff({
 
 	const oldLines = oldContent.split('\n')
 	const newLines = newContent.split('\n')
-	const maxLength = Math.max(oldLines.length, newLines.length)
 	const oldHeader = problemContent === undefined ? '/dev/null' : `a/${path}`
 	const newHeader = solutionContent === undefined ? '/dev/null' : `b/${path}`
 	const diffLines = [
@@ -415,22 +504,12 @@ function createSimpleUnifiedDiff({
 		`+++ ${newHeader}`,
 	]
 
-	for (let index = 0; index < maxLength; index++) {
-		const oldLine = oldLines[index]
-		const newLine = newLines[index]
-		if (oldLine === newLine) {
-			if (oldLine !== undefined) {
-				diffLines.push(` ${oldLine}`)
-			}
-			continue
-		}
-		if (oldLine !== undefined) {
-			diffLines.push(`-${oldLine}`)
-		}
-		if (newLine !== undefined) {
-			diffLines.push(`+${newLine}`)
-		}
-	}
+	diffLines.push(
+		...buildDiffLines({
+			oldLines,
+			newLines,
+		}),
+	)
 
 	return diffLines.join('\n')
 }

@@ -42,7 +42,7 @@ export const retrieveDiffContextInputSchema = {
 	workshop: z.string().trim().min(1),
 	exerciseNumber: z.coerce.number().int().positive(),
 	stepNumber: z.coerce.number().int().positive().optional(),
-	focus: z.string().trim().min(1).optional(),
+	focus: z.string().trim().optional(),
 	...commonRetrievalSchema,
 }
 

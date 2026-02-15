@@ -330,6 +330,18 @@ test('createSimpleUnifiedDiff includes changed lines', () => {
 	expect(diff).toContain('+const value = 2')
 })
 
+test('createSimpleUnifiedDiff keeps aligned lines after insertions', () => {
+	const diff = workshopIndexerTestUtils.createSimpleUnifiedDiff({
+		path: 'src/index.ts',
+		problemContent: 'const value = 1\nconsole.log(value)\n',
+		solutionContent:
+			'const value = 1\nconsole.log(value)\nconsole.log("added")\n',
+	})
+	expect(diff).toContain('+console.log("added")')
+	expect(diff).toContain(' console.log(value)')
+	expect(diff).not.toContain('-console.log(value)')
+})
+
 test('shouldIgnoreDiffPath respects wildcard patterns', () => {
 	const ignored = workshopIndexerTestUtils.shouldIgnoreDiffPath('README.mdx', [
 		'README.*',
