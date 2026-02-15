@@ -2,10 +2,9 @@ import { z } from 'zod'
 import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
+const maxWorkshopFilters = 100
 
-const workshopFilterSchema = z
-	.array(z.string().trim().min(1))
-	.max(100, 'workshops must include at most 100 entries.')
+const workshopFilterSchema = z.array(z.string().trim().min(1))
 
 const reindexBodySchema = z.object({
 	workshops: z
@@ -46,6 +45,17 @@ function methodNotAllowedResponse() {
 		status: 405,
 		headers: { Allow: 'POST' },
 	})
+}
+
+function invalidReindexPayloadResponse(details: Array<string>) {
+	return Response.json(
+		{
+			ok: false,
+			error: 'Invalid reindex payload.',
+			details,
+		},
+		{ status: 400 },
+	)
 }
 
 function getBearerToken(request: Request) {
@@ -90,19 +100,19 @@ export async function handleWorkshopIndexRequest(
 	}
 	const parsedBody = reindexBodySchema.safeParse(body)
 	if (!parsedBody.success) {
-		return Response.json(
-			{
-				ok: false,
-				error: 'Invalid reindex payload.',
-				details: parsedBody.error.issues.map((issue) => issue.message),
-			},
-			{ status: 400 },
+		return invalidReindexPayloadResponse(
+			parsedBody.error.issues.map((issue) => issue.message),
 		)
 	}
 
 	const runWorkshopReindexFn =
 		options.runWorkshopReindexFn ?? runWorkshopReindex
 	const normalizedWorkshops = normalizeWorkshops(parsedBody.data.workshops)
+	if (normalizedWorkshops && normalizedWorkshops.length > maxWorkshopFilters) {
+		return invalidReindexPayloadResponse([
+			'workshops must include at most 100 entries.',
+		])
+	}
 
 	try {
 		const summary = await runWorkshopReindexFn({

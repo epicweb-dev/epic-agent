@@ -118,6 +118,39 @@ test('workshop index route rejects oversized string workshop filters', async () 
 	})
 })
 
+test('workshop index route allows oversized duplicate workshop filters after normalization', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: Array.from({ length: 101 }, () => 'MCP-FUNDAMENTALS'),
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 1,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toEqual(['mcp-fundamentals'])
+})
+
 test('workshop index route returns reindex summary when authorized', async () => {
 	let capturedWorkshops: Array<string> | undefined
 	const response = await handleWorkshopIndexRequest(

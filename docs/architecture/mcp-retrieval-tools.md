@@ -101,10 +101,11 @@ chunks used by retrieval tools. Optional `workshops` filters may be sent as an
 array or as a comma/newline-delimited string; values are trimmed, lowercased,
 and deduplicated server-side. Empty lists fall back to full discovery-based
 reindex. For operational safety, the route accepts at most 100 workshop filters
-per request. If any requested workshop slug is unknown, the request fails with
-an explicit error. The `🧠 Load Workshop Content` workflow mirrors these
-guardrails by lowercasing/normalizing filters and failing fast if more than 100
-unique workshop slugs are provided.
+after normalization (trim/lowercase/dedupe). If any requested workshop slug is
+unknown, the request fails with an explicit error. The
+`🧠 Load Workshop Content` workflow mirrors these guardrails by
+lowercasing/normalizing filters and failing fast if more than 100 unique
+workshop slugs are provided.
 
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an
