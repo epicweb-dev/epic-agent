@@ -76,12 +76,23 @@ bun ./docs/post-download.ts --guided
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
 - `APP_BASE_URL` (production app URL)
 - `APP_BASE_URL_PREVIEW` (optional preview URL for PR preview deploys)
+- `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected workshop reindex calls)
+- `GITHUB_TOKEN` (optional but recommended for higher indexing throughput)
 
 3. Deploy:
 
 ```
 bun run deploy
 ```
+
+## Load workshop content in GitHub Actions
+
+After deploy, run the `🧠 Load Workshop Content` workflow from the Actions tab
+to populate D1 and Vectorize via the protected reindex endpoint.
+
+- choose the target environment (`production` or `preview`)
+- optionally provide comma-separated workshop slugs to scope the index run
+- leave workshop input empty to index all workshop repositories
 
 ## Agent/CI setup
 

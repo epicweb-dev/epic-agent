@@ -24,6 +24,10 @@ jobs:
   load-workshop-content:
     name: 🧠 Reindex workshops into D1 + Vectorize
     runs-on: ubuntu-latest
+    concurrency:
+      group: workshop-content-load-${{ inputs.environment }}
+      cancel-in-progress: false
+    timeout-minutes: 45
     steps:
       - name: 🔎 Resolve target environment URL
         id: target
@@ -32,6 +36,8 @@ jobs:
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           APP_BASE_URL_PREVIEW: ${{ secrets.APP_BASE_URL_PREVIEW }}
         run: |
+          set -euo pipefail
+
           if [ "$TARGET_ENVIRONMENT" = "preview" ]; then
             TARGET_URL="${APP_BASE_URL_PREVIEW:-$APP_BASE_URL}"
           else
@@ -50,6 +56,8 @@ jobs:
         env:
           WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
         run: |
+          set -euo pipefail
+
           if [ -z "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
             echo "Missing WORKSHOP_INDEX_ADMIN_TOKEN secret." >&2
             exit 1
@@ -62,6 +70,8 @@ jobs:
           WORKSHOP_LIST_INPUT: ${{ inputs.workshops }}
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
+          set -euo pipefail
+
           if [ -n "$WORKSHOP_LIST_INPUT" ]; then
             WORKSHOPS_JSON=$(printf '%s' "$WORKSHOP_LIST_INPUT" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')
             PAYLOAD=$(jq -nc --argjson workshops "$WORKSHOPS_JSON" '{ workshops: $workshops }')
