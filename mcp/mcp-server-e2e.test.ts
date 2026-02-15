@@ -26,6 +26,7 @@ const defaultTimeoutMs = 60_000
 const indexingTimeoutMs = 240_000
 const testWorkshopIndexAdminToken = 'test-workshop-index-token'
 const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
+const runtimeGitHubToken = resolveRuntimeGitHubToken()
 
 const passwordHashPrefix = 'pbkdf2_sha256'
 const passwordSaltBytes = 16
@@ -34,6 +35,26 @@ const passwordHashIterations = 100_000
 
 function delay(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function resolveRuntimeGitHubToken() {
+	const configuredToken = process.env.GITHUB_TOKEN?.trim()
+	if (configuredToken) return configuredToken
+	if (!runWorkshopNetworkTests) return undefined
+
+	try {
+		const tokenLookup = Bun.spawnSync({
+			cmd: ['gh', 'auth', 'token'],
+			cwd: projectRoot,
+			stdout: 'pipe',
+			stderr: 'pipe',
+		})
+		if (tokenLookup.exitCode !== 0) return undefined
+		const token = tokenLookup.stdout.toString().trim()
+		return token.length > 0 ? token : undefined
+	} catch {
+		return undefined
+	}
 }
 
 function toHex(bytes: Uint8Array) {
@@ -576,7 +597,6 @@ async function startDevServer(persistDir: string) {
 		'--log-level',
 		wranglerLogLevel,
 	]
-	const runtimeGitHubToken = process.env.GITHUB_TOKEN?.trim()
 	if (runtimeGitHubToken) {
 		devCommand.push('--var', `GITHUB_TOKEN:${runtimeGitHubToken}`)
 	}
