@@ -279,12 +279,13 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 
 	const result = await searchTopicContext({
 		env,
-		query: 'schema validation',
+		query: '  schema validation  ',
 		limit: 4,
 		workshop: 'mcp-fundamentals',
 		exerciseNumber: 2,
 	})
 
+	expect(result.query).toBe('schema validation')
 	expect(observedTopK).toBe(4)
 	expect(observedFilter).toEqual({
 		workshop_slug: 'mcp-fundamentals',
