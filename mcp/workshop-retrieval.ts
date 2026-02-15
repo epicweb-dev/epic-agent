@@ -9,6 +9,7 @@ import {
 	type RetrievalSection,
 } from './workshop-truncation.ts'
 import {
+	listWorkshopsMaxLimit,
 	topicSearchMaxLimit,
 	type RetrieveLearningContextInput,
 } from './workshop-contracts.ts'
@@ -163,7 +164,7 @@ export async function retrieveWorkshopList({
 	hasDiffs?: boolean
 }) {
 	const startedAt = Date.now()
-	const maxLimit = Math.min(Math.max(limit ?? 20, 1), 100)
+	const maxLimit = Math.min(Math.max(limit ?? 20, 1), listWorkshopsMaxLimit)
 	const result = await listIndexedWorkshops({
 		db: env.APP_DB,
 		limit: maxLimit,

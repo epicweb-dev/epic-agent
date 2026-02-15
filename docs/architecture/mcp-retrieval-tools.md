@@ -26,6 +26,7 @@ Supported filters:
 
 - `product`
 - `hasDiffs`
+- `limit` is clamped to a maximum of `100` per request
 
 ## `retrieve_learning_context`
 

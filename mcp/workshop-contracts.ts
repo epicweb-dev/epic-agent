@@ -1,9 +1,15 @@
 import { z } from 'zod'
 
+export const listWorkshopsMaxLimit = 100
 export const topicSearchMaxLimit = 20
 
 export const listWorkshopsInputSchema = {
-	limit: z.coerce.number().int().positive().max(100).optional(),
+	limit: z.coerce
+		.number()
+		.int()
+		.positive()
+		.max(listWorkshopsMaxLimit)
+		.optional(),
 	cursor: z.string().optional(),
 	product: z.string().trim().min(1).optional(),
 	hasDiffs: z.boolean().optional(),

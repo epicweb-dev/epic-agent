@@ -2,9 +2,13 @@
 import { expect, test } from 'bun:test'
 import {
 	retrieveDiffContext,
+	retrieveWorkshopList,
 	searchTopicContext,
 } from './workshop-retrieval.ts'
-import { topicSearchMaxLimit } from './workshop-contracts.ts'
+import {
+	listWorkshopsMaxLimit,
+	topicSearchMaxLimit,
+} from './workshop-contracts.ts'
 
 type MockQueryMatch = {
 	id: string
@@ -208,6 +212,55 @@ test('searchTopicContext throws clear error without bindings', async () => {
 	).rejects.toThrow(
 		'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
 	)
+})
+
+test('retrieveWorkshopList clamps limit to shared max', async () => {
+	const observedListBindCalls: Array<Array<number>> = []
+	const db = {
+		prepare(query: string) {
+			if (query.includes('COUNT(*) AS total')) {
+				return {
+					bind() {
+						return {
+							async first() {
+								return { total: 1 }
+							},
+						}
+					},
+				}
+			}
+			return {
+				bind(...args: Array<number>) {
+					observedListBindCalls.push(args)
+					return {
+						async all() {
+							return {
+								results: [
+									{
+										workshop_slug: 'mcp-fundamentals',
+										title: 'MCP Fundamentals',
+										exercise_count: 3,
+										has_diffs: 1,
+										last_indexed_at: '2026-02-14T00:00:00.000Z',
+										product: 'epicweb',
+									},
+								],
+							}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+	const env = { APP_DB: db } as unknown as Env
+
+	const result = await retrieveWorkshopList({
+		env,
+		limit: 999,
+	})
+
+	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit, 0]])
+	expect(result.workshops).toHaveLength(1)
 })
 
 test('searchTopicContext validates workshop scope before binding checks', async () => {
