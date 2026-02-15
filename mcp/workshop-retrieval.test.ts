@@ -217,18 +217,7 @@ test('searchTopicContext throws clear error without bindings', async () => {
 test('retrieveWorkshopList clamps limit to shared max', async () => {
 	const observedListBindCalls: Array<Array<number>> = []
 	const db = {
-		prepare(query: string) {
-			if (query.includes('COUNT(*) AS total')) {
-				return {
-					bind() {
-						return {
-							async first() {
-								return { total: 1 }
-							},
-						}
-					},
-				}
-			}
+		prepare() {
 			return {
 				bind(...args: Array<number>) {
 					observedListBindCalls.push(args)
@@ -259,7 +248,7 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 		limit: 999,
 	})
 
-	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit, 0]])
+	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
 	expect(result.workshops).toHaveLength(1)
 })
 

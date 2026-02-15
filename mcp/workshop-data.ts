@@ -157,10 +157,12 @@ export async function listIndexedWorkshops({
 
 	const result = await db
 		.prepare(query)
-		.bind(...params, limit, pagination.offset)
+		.bind(...params, limit + 1, pagination.offset)
 		.all()
 	const rows = workshopRowSchema.array().parse(result.results ?? [])
-	const workshops: Array<WorkshopSummary> = rows.map((row) => ({
+	const hasNextPage = rows.length > limit
+	const pagedRows = hasNextPage ? rows.slice(0, limit) : rows
+	const workshops: Array<WorkshopSummary> = pagedRows.map((row) => ({
 		workshop: row.workshop_slug,
 		title: row.title,
 		exerciseCount: row.exercise_count,
@@ -169,22 +171,9 @@ export async function listIndexedWorkshops({
 		product: row.product ?? undefined,
 	}))
 
-	const nextOffset = pagination.offset + workshops.length
-	let nextCursor: string | null = null
-	if (workshops.length >= limit) {
-		const countQuery = `
-			SELECT COUNT(*) AS total
-			FROM indexed_workshops
-			${whereSql}
-		`
-		const countResult = await db
-			.prepare(countQuery)
-			.bind(...params)
-			.first<{ total?: number }>()
-		const total = Number(countResult?.total ?? 0)
-		nextCursor =
-			nextOffset < total ? encodeCursor({ offset: nextOffset }) : null
-	}
+	const nextCursor = hasNextPage
+		? encodeCursor({ offset: pagination.offset + workshops.length })
+		: null
 
 	return { workshops, nextCursor }
 }

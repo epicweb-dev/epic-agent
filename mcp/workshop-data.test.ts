@@ -48,7 +48,7 @@ test('listStoredVectorIdsForWorkshop normalizes and dedupes ids', async () => {
 	expect(vectorIds).toEqual(['run:one', 'run:two'])
 })
 
-test('listIndexedWorkshops only counts when page could continue', async () => {
+test('listIndexedWorkshops paginates with lookahead rows', async () => {
 	const rows: Array<IndexedWorkshopRow> = [
 		{
 			workshop_slug: 'a-workshop',
@@ -75,22 +75,10 @@ test('listIndexedWorkshops only counts when page could continue', async () => {
 			product: null,
 		},
 	]
-	let countQueryCalls = 0
 	const observedListBinds: Array<Array<number>> = []
 	const db = {
 		prepare(query: string) {
-			if (query.includes('COUNT(*) AS total')) {
-				return {
-					bind() {
-						countQueryCalls += 1
-						return {
-							async first() {
-								return { total: rows.length }
-							},
-						}
-					},
-				}
-			}
+			expect(query).not.toContain('COUNT(*) AS total')
 			return {
 				bind(...args: Array<number>) {
 					observedListBinds.push(args)
@@ -114,7 +102,6 @@ test('listIndexedWorkshops only counts when page could continue', async () => {
 	})
 	expect(firstPage.workshops).toHaveLength(2)
 	expect(typeof firstPage.nextCursor).toBe('string')
-	expect(countQueryCalls).toBe(1)
 
 	const secondPage = await listIndexedWorkshops({
 		db,
@@ -123,30 +110,20 @@ test('listIndexedWorkshops only counts when page could continue', async () => {
 	})
 	expect(secondPage.workshops).toHaveLength(1)
 	expect(secondPage.nextCursor).toBeNull()
-	expect(countQueryCalls).toBe(1)
 	expect(observedListBinds).toEqual([
-		[2, 0],
-		[2, 2],
+		[3, 0],
+		[3, 2],
 	])
 })
 
 test('listIndexedWorkshops resets invalid cursor offsets to zero', async () => {
 	let observedOffset = -1
+	let observedLimit = -1
 	const db = {
-		prepare(query: string) {
-			if (query.includes('COUNT(*) AS total')) {
-				return {
-					bind() {
-						return {
-							async first() {
-								return { total: 1 }
-							},
-						}
-					},
-				}
-			}
+		prepare() {
 			return {
 				bind(...args: Array<number>) {
+					observedLimit = Number(args.at(-2) ?? -1)
 					observedOffset = Number(args.at(-1) ?? -1)
 					return {
 						async all() {
@@ -167,6 +144,7 @@ test('listIndexedWorkshops resets invalid cursor offsets to zero', async () => {
 	})
 
 	expect(observedOffset).toBe(0)
+	expect(observedLimit).toBe(6)
 	expect(result.workshops).toEqual([])
 	expect(result.nextCursor).toBeNull()
 })
