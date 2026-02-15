@@ -86,11 +86,12 @@ export async function handleMcpRequest({
 }) {
 	const url = new URL(request.url)
 	const authHeader = request.headers.get('Authorization')
-	if (!authHeader || !authHeader.startsWith('Bearer ')) {
+	const bearerTokenMatch = authHeader?.match(/^bearer\s+(.+)$/i) ?? null
+	if (!bearerTokenMatch) {
 		return createUnauthorizedResponse(url)
 	}
 
-	const token = authHeader.slice('Bearer '.length).trim()
+	const token = bearerTokenMatch[1]?.trim()
 	if (!token) {
 		return createUnauthorizedResponse(url)
 	}

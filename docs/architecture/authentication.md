@@ -63,7 +63,7 @@ OAuth endpoints are implemented in `worker/oauth-handlers.ts` and routed from
 
 `/mcp` is protected by `worker/mcp-auth.ts`:
 
-- Requires `Authorization: Bearer <token>`
+- Requires `Authorization: Bearer <token>` (bearer scheme is case-insensitive)
 - Token is validated via OAuth provider helpers (`unwrapToken`)
 - Audience must match the app origin or `<origin>/mcp`
 - Unauthenticated requests return `401` with `WWW-Authenticate` metadata
