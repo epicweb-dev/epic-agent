@@ -1164,6 +1164,32 @@ test(
 )
 
 test(
+	'search_topic_context validates workshop exercise scope before vector binding checks',
+	async () => {
+		await using database = await createTestDatabase()
+		await seedIndexedWorkshopData(database.persistDir)
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'search_topic_context',
+			arguments: {
+				query: 'model context protocol',
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 99,
+			},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain(
+			'Unknown exercise 99 for workshop "mcp-fundamentals".',
+		)
+		expect(textOutput).not.toContain('Vector search is unavailable')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
 	'search_topic_context validates step scope before vector binding checks',
 	async () => {
 		await using database = await createTestDatabase()
