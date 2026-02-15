@@ -971,6 +971,51 @@ test(
 	{ timeout: defaultTimeoutMs },
 )
 
+test(
+	'retrieve_diff_context focus filter is case-insensitive and trims no-match errors',
+	async () => {
+		await using database = await createTestDatabase()
+		await seedIndexedWorkshopData(database.persistDir)
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const focusedResult = await mcpClient.client.callTool({
+			name: 'retrieve_diff_context',
+			arguments: {
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 1,
+				stepNumber: 1,
+				focus: 'SRC/INDEX.TS',
+			},
+		})
+		const focusedOutput = getTextResultContent(focusedResult as CallToolResult)
+		const focusedPayload = JSON.parse(focusedOutput) as {
+			diffSections: Array<{ sourcePath?: string; content: string }>
+		}
+		expect(focusedPayload.diffSections.length).toBeGreaterThan(0)
+		expect(
+			focusedPayload.diffSections.some((section) =>
+				(section.sourcePath ?? '').toLowerCase().includes('src/index.ts'),
+			),
+		).toBe(true)
+
+		const noMatchResult = await mcpClient.client.callTool({
+			name: 'retrieve_diff_context',
+			arguments: {
+				workshop: 'mcp-fundamentals',
+				exerciseNumber: 1,
+				stepNumber: 1,
+				focus: '   no-such-file   ',
+			},
+		})
+		const noMatchOutput = getTextResultContent(noMatchResult as CallToolResult)
+		expect(noMatchOutput).toContain(
+			'No diff context matched focus "no-such-file" for workshop "mcp-fundamentals" exercise 1.',
+		)
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
 const networkTest = runWorkshopNetworkTests ? test : test.skip
 
 networkTest(

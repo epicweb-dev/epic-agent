@@ -55,8 +55,12 @@ workshop/exercise(/step).
 
 Supports:
 
-- optional `focus` filtering
+- optional case-insensitive `focus` filtering over diff section
+  label/kind/source path/content
 - same payload controls as learning context (`maxChars`, `cursor`)
+
+If a non-empty `focus` value yields no diff matches, the tool returns a
+focus-specific error so callers can quickly adjust their query.
 
 ## `search_topic_context`
 

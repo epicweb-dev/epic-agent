@@ -353,11 +353,17 @@ export async function retrieveDiffContext({
 		stepNumber,
 		diffOnly: true,
 	})
+	const normalizedFocus = typeof focus === 'string' ? focus.trim() : ''
 	const focusedSections =
-		typeof focus === 'string'
-			? filterByFocus(diffSections, focus)
+		normalizedFocus.length > 0
+			? filterByFocus(diffSections, normalizedFocus)
 			: diffSections
 	if (focusedSections.length === 0) {
+		if (normalizedFocus.length > 0) {
+			throw new Error(
+				`No diff context matched focus "${normalizedFocus}" for workshop "${workshop}" exercise ${exerciseNumber}.`,
+			)
+		}
 		throw new Error(
 			`No diff context found for workshop "${workshop}" exercise ${exerciseNumber}.`,
 		)
