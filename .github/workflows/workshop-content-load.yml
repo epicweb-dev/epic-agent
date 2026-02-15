@@ -302,6 +302,7 @@ NODE
             )
 
             RESPONSE_BODY=$(<"$RESPONSE_FILE")
+            rm -f "$RESPONSE_FILE"
             echo "Reindex response (iteration $ITERATION): $RESPONSE_BODY"
 
             if ! printf '%s' "$RESPONSE_BODY" | jq -e . >/dev/null; then
