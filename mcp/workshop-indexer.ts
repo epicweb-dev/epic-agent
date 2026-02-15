@@ -59,6 +59,7 @@ const defaultVectorUpsertBatchSize = 200
 const vectorDeleteBatchSize = 500
 const githubRequestMaxAttempts = 3
 const githubRetryBaseDelayMs = 500
+const githubRetryMaxDelayMs = 30_000
 
 const textFileExtensions = new Set([
 	'.ts',
@@ -588,19 +589,31 @@ function resolveRetryDelayMs({
 	attempt,
 	retryAfterHeader,
 	baseDelayMs = githubRetryBaseDelayMs,
+	maxDelayMs = githubRetryMaxDelayMs,
+	nowMs = Date.now(),
 }: {
 	attempt: number
 	retryAfterHeader?: string | null
 	baseDelayMs?: number
+	maxDelayMs?: number
+	nowMs?: number
 }) {
+	const normalizedRetryAfterHeader = (retryAfterHeader ?? '').trim()
 	const parsedRetryAfterSeconds = Number.parseInt(
-		(retryAfterHeader ?? '').trim(),
+		normalizedRetryAfterHeader,
 		10,
 	)
 	if (Number.isFinite(parsedRetryAfterSeconds) && parsedRetryAfterSeconds > 0) {
-		return parsedRetryAfterSeconds * 1_000
+		return Math.min(parsedRetryAfterSeconds * 1_000, maxDelayMs)
 	}
-	return baseDelayMs * 2 ** Math.max(0, attempt - 1)
+	const parsedRetryAfterDate = Date.parse(normalizedRetryAfterHeader)
+	if (Number.isFinite(parsedRetryAfterDate)) {
+		const delayFromDateMs = Math.max(0, parsedRetryAfterDate - nowMs)
+		if (delayFromDateMs > 0) {
+			return Math.min(delayFromDateMs, maxDelayMs)
+		}
+	}
+	return Math.min(baseDelayMs * 2 ** Math.max(0, attempt - 1), maxDelayMs)
 }
 
 export const workshopIndexerTestUtils = {

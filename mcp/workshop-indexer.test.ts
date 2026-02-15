@@ -319,6 +319,14 @@ test('resolveRetryDelayMs prefers retry-after header and falls back to backoff',
 			retryAfterHeader: '7',
 		}),
 	).toBe(7_000)
+	const nowMs = Date.parse('2026-01-01T00:00:00.000Z')
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			nowMs,
+			attempt: 2,
+			retryAfterHeader: 'Thu, 01 Jan 2026 00:00:03 GMT',
+		}),
+	).toBe(3_000)
 	expect(
 		workshopIndexerTestUtils.resolveRetryDelayMs({
 			attempt: 3,
@@ -331,4 +339,21 @@ test('resolveRetryDelayMs prefers retry-after header and falls back to backoff',
 			baseDelayMs: 200,
 		}),
 	).toBe(400)
+})
+
+test('resolveRetryDelayMs caps long retry delays', () => {
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			attempt: 2,
+			retryAfterHeader: '120',
+			maxDelayMs: 10_000,
+		}),
+	).toBe(10_000)
+	expect(
+		workshopIndexerTestUtils.resolveRetryDelayMs({
+			attempt: 10,
+			baseDelayMs: 5_000,
+			maxDelayMs: 9_000,
+		}),
+	).toBe(9_000)
 })

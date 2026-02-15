@@ -93,4 +93,5 @@ chunks used by retrieval tools.
 
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an
-error, and they honor `Retry-After` delays when provided by GitHub.
+error, and they honor `Retry-After` delays when provided by GitHub (capped to a
+bounded maximum delay).
