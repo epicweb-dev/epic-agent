@@ -41,6 +41,7 @@ type IndexSummary = {
 	stepCount: number
 	sectionCount: number
 	sectionChunkCount: number
+	nextCursor?: string
 }
 
 type WorkshopIndexEnv = Env & {
@@ -67,6 +68,68 @@ const vectorDeleteBatchSize = 500
 const githubRequestMaxAttempts = 3
 const githubRetryBaseDelayMs = 500
 const githubRetryMaxDelayMs = 30_000
+const workshopReindexMaxBatchSize = 20
+
+type ReindexCursor = {
+	offset: number
+}
+
+function encodeReindexCursor(cursor: ReindexCursor) {
+	return btoa(JSON.stringify(cursor))
+}
+
+function decodeReindexCursor(cursor: string | undefined): ReindexCursor {
+	if (!cursor) return { offset: 0 }
+	try {
+		const parsed = JSON.parse(atob(cursor)) as unknown
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			'offset' in parsed &&
+			typeof parsed.offset === 'number' &&
+			parsed.offset >= 0
+		) {
+			return { offset: Math.floor(parsed.offset) }
+		}
+		return { offset: 0 }
+	} catch {
+		return { offset: 0 }
+	}
+}
+
+function resolveReindexRepositoryBatch({
+	repositories,
+	cursor,
+	batchSize,
+}: {
+	repositories: Array<WorkshopRepository>
+	cursor?: string
+	batchSize?: number
+}) {
+	const decodedCursor = decodeReindexCursor(cursor)
+	const offset = decodedCursor.offset
+	const limit =
+		typeof batchSize === 'number' && Number.isFinite(batchSize)
+			? Math.min(
+					workshopReindexMaxBatchSize,
+					Math.max(1, Math.floor(batchSize)),
+				)
+			: repositories.length
+
+	const batch = repositories.slice(offset, offset + limit)
+	const nextOffset = offset + batch.length
+	const nextCursor =
+		batch.length > 0 && nextOffset < repositories.length
+			? encodeReindexCursor({ offset: nextOffset })
+			: undefined
+
+	return {
+		batch,
+		offset,
+		limit,
+		nextCursor,
+	}
+}
 
 const textFileExtensions = new Set([
 	'.ts',
@@ -729,6 +792,9 @@ export const workshopIndexerTestUtils = {
 	shouldRetryGitHubFetchError,
 	formatGitHubFetchError,
 	resolveRetryDelayMs,
+	encodeReindexCursor,
+	decodeReindexCursor,
+	resolveReindexRepositoryBatch,
 }
 
 async function githubJson<T>({
@@ -1348,9 +1414,13 @@ async function indexWorkshopRepository({
 export async function runWorkshopReindex({
 	env,
 	onlyWorkshops,
+	cursor,
+	batchSize,
 }: {
 	env: WorkshopIndexEnv
 	onlyWorkshops?: Array<string>
+	cursor?: string
+	batchSize?: number
 }): Promise<IndexSummary> {
 	const db = env.APP_DB
 	const runId = await createIndexRun(db)
@@ -1371,14 +1441,22 @@ export async function runWorkshopReindex({
 
 	try {
 		const repositories = await listWorkshopRepositories({ env, onlyWorkshops })
+		const batch = resolveReindexRepositoryBatch({
+			repositories,
+			cursor,
+			batchSize,
+		})
 		console.info(
 			'workshop-reindex-discovery',
 			JSON.stringify({
 				runId,
 				repositoryCount: repositories.length,
+				offset: batch.offset,
+				limit: batch.limit,
+				batchCount: batch.batch.length,
 			}),
 		)
-		for (const repository of repositories) {
+		for (const repository of batch.batch) {
 			const repositoryStart = Date.now()
 			const indexed = await indexWorkshopRepository({
 				env,
@@ -1461,26 +1539,23 @@ export async function runWorkshopReindex({
 			sectionCount,
 			sectionChunkCount,
 		})
-		console.info(
-			'workshop-reindex-complete',
-			JSON.stringify({
-				runId,
-				workshopCount,
-				exerciseCount,
-				stepCount,
-				sectionCount,
-				sectionChunkCount,
-				durationMs: Date.now() - startedAt,
-			}),
-		)
-		return {
+		const summary: IndexSummary = {
 			runId,
 			workshopCount,
 			exerciseCount,
 			stepCount,
 			sectionCount,
 			sectionChunkCount,
+			...(batch.nextCursor ? { nextCursor: batch.nextCursor } : {}),
 		}
+		console.info(
+			'workshop-reindex-complete',
+			JSON.stringify({
+				...summary,
+				durationMs: Date.now() - startedAt,
+			}),
+		)
+		return summary
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 		try {

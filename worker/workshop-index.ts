@@ -25,6 +25,8 @@ const reindexBodySchema = z.object({
 				.filter(Boolean)
 		}, workshopFilterSchema)
 		.optional(),
+	cursor: z.string().trim().min(1).optional(),
+	batchSize: z.number().int().min(1).max(20).optional(),
 })
 
 function normalizeWorkshops(workshops: Array<string> | undefined) {
@@ -154,6 +156,8 @@ export async function handleWorkshopIndexRequest(
 	const runWorkshopReindexFn =
 		options.runWorkshopReindexFn ?? runWorkshopReindex
 	const normalizedWorkshops = normalizeWorkshops(parsedBody.data.workshops)
+	const cursor = parsedBody.data.cursor?.trim() || undefined
+	const batchSize = parsedBody.data.batchSize
 	if (
 		normalizedWorkshops &&
 		normalizedWorkshops.length > workshopFilterMaxCount
@@ -165,6 +169,8 @@ export async function handleWorkshopIndexRequest(
 		const summary = await runWorkshopReindexFn({
 			env,
 			onlyWorkshops: normalizedWorkshops,
+			cursor,
+			batchSize,
 		})
 		return Response.json({
 			ok: true,

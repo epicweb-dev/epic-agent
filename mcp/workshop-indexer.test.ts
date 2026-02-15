@@ -148,6 +148,74 @@ test('filterRequestedRepositories trims, lowercases, dedupes, and filters select
 	])
 })
 
+test('reindex cursor encoding and decoding is stable', () => {
+	const encoded = workshopIndexerTestUtils.encodeReindexCursor({ offset: 5 })
+	expect(workshopIndexerTestUtils.decodeReindexCursor(encoded)).toEqual({
+		offset: 5,
+	})
+	expect(workshopIndexerTestUtils.decodeReindexCursor('not-base64')).toEqual({
+		offset: 0,
+	})
+	expect(workshopIndexerTestUtils.decodeReindexCursor(undefined)).toEqual({
+		offset: 0,
+	})
+})
+
+test('resolveReindexRepositoryBatch slices repositories and returns next cursor', () => {
+	const repositories = Array.from({ length: 5 }, (_value, index) => ({
+		owner: 'epicweb-dev',
+		name: `workshop-${index + 1}`,
+		defaultBranch: 'main',
+	}))
+	const firstBatch = workshopIndexerTestUtils.resolveReindexRepositoryBatch({
+		repositories,
+		batchSize: 2,
+	})
+	expect(firstBatch.offset).toBe(0)
+	expect(firstBatch.limit).toBe(2)
+	expect(firstBatch.batch.map((repo) => repo.name)).toEqual([
+		'workshop-1',
+		'workshop-2',
+	])
+	expect(firstBatch.nextCursor).toBeTruthy()
+
+	const secondBatch = workshopIndexerTestUtils.resolveReindexRepositoryBatch({
+		repositories,
+		batchSize: 2,
+		cursor: firstBatch.nextCursor,
+	})
+	expect(secondBatch.offset).toBe(2)
+	expect(secondBatch.batch.map((repo) => repo.name)).toEqual([
+		'workshop-3',
+		'workshop-4',
+	])
+	expect(secondBatch.nextCursor).toBeTruthy()
+
+	const finalBatch = workshopIndexerTestUtils.resolveReindexRepositoryBatch({
+		repositories,
+		batchSize: 20,
+		cursor: secondBatch.nextCursor,
+	})
+	expect(finalBatch.offset).toBe(4)
+	expect(finalBatch.batch.map((repo) => repo.name)).toEqual(['workshop-5'])
+	expect(finalBatch.nextCursor).toBeUndefined()
+})
+
+test('resolveReindexRepositoryBatch clamps batch size to max limit', () => {
+	const repositories = Array.from({ length: 40 }, (_value, index) => ({
+		owner: 'epicweb-dev',
+		name: `workshop-${index + 1}`,
+		defaultBranch: 'main',
+	}))
+	const batch = workshopIndexerTestUtils.resolveReindexRepositoryBatch({
+		repositories,
+		batchSize: 100,
+	})
+	expect(batch.limit).toBe(20)
+	expect(batch.batch).toHaveLength(20)
+	expect(batch.nextCursor).toBeTruthy()
+})
+
 test('filterRequestedRepositories throws for unknown requested workshops', () => {
 	const repositories = [
 		{

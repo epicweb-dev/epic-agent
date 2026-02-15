@@ -112,6 +112,12 @@ workflow mirrors these guardrails by lowercasing/normalizing filters, failing
 fast if more than 100 unique workshop slugs are provided, and pre-checking the
 serialized payload size before it calls the route.
 
+To avoid long-running request timeouts, the reindex route also supports optional
+pagination:
+
+- request fields: `cursor` and `batchSize` (1-20)
+- response field: `nextCursor` (present when more workshops remain)
+
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an
 error, and they honor `Retry-After` delays when provided by GitHub (capped to a
