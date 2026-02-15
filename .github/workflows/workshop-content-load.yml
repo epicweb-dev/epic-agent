@@ -35,6 +35,9 @@ jobs:
       cancel-in-progress: false
     timeout-minutes: 45
     steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
       - name: 🔎 Resolve target environment URL
         id: target
         env:
@@ -45,39 +48,151 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "$TARGET_ENVIRONMENT" = "preview" ]; then
-            if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-              echo "Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret (required to determine preview URL)." >&2
-              exit 1
-            fi
+          WRANGLER_CONFIG_PATH="wrangler.jsonc"
+          if [ ! -f "$WRANGLER_CONFIG_PATH" ]; then
+            echo "Missing $WRANGLER_CONFIG_PATH in repo root. Ensure checkout ran." >&2
+            exit 1
+          fi
 
-            SUBDOMAIN=$(
+          WRANGLER_CONFIG_JSON="$(
+            node - "$WRANGLER_CONFIG_PATH" <<'NODE'
+const fs = require("fs");
+const path = process.argv[2];
+const raw = fs.readFileSync(path, "utf8");
+const stripped = raw
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "")
+  .replace(/,\s*([}\]])/g, "$1");
+const data = JSON.parse(stripped);
+process.stdout.write(JSON.stringify(data));
+NODE
+          )"
+
+          BASE_WORKER_NAME="$(printf '%s' "$WRANGLER_CONFIG_JSON" | jq -r '.name // empty')"
+          if [ -z "$BASE_WORKER_NAME" ]; then
+            echo "Unable to read .name from $WRANGLER_CONFIG_PATH." >&2
+            exit 1
+          fi
+
+          PRODUCTION_WORKER_NAME="$(printf '%s' "$WRANGLER_CONFIG_JSON" | jq -r '.env.production.name // empty')"
+          if [ -z "$PRODUCTION_WORKER_NAME" ]; then
+            PRODUCTION_WORKER_NAME="${BASE_WORKER_NAME}-production"
+          fi
+
+          PREVIEW_WORKER_NAME="$(printf '%s' "$WRANGLER_CONFIG_JSON" | jq -r '.env.preview.name // empty')"
+          if [ -z "$PREVIEW_WORKER_NAME" ]; then
+            PREVIEW_WORKER_NAME="${BASE_WORKER_NAME}-preview"
+          fi
+
+          APP_BASE_URL_TRIMMED="$(printf '%s' "${APP_BASE_URL:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          APP_BASE_URL_TRIMMED="${APP_BASE_URL_TRIMMED%/}"
+
+          SUBDOMAIN=""
+          if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            if ! SUBDOMAIN="$(
               curl --silent --show-error \
                 --request GET \
                 --url "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain" \
                 --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
                 --header 'Content-Type: application/json' \
                 | jq -r '.result.subdomain // empty'
-            )
+            )"; then
+              SUBDOMAIN=""
+            fi
+          fi
 
+          DERIVED_URL=""
+          if [ "$TARGET_ENVIRONMENT" = "preview" ]; then
             if [ -z "$SUBDOMAIN" ]; then
-              echo "Unable to resolve workers.dev subdomain from Cloudflare API." >&2
+              if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+                echo "Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret (required to determine preview URL)." >&2
+              else
+                echo "Unable to resolve workers.dev subdomain from Cloudflare API." >&2
+              fi
               exit 1
             fi
-
-            TARGET_URL="https://epic-agent-preview.${SUBDOMAIN}.workers.dev"
-          else
-            TARGET_URL="$APP_BASE_URL"
+            DERIVED_URL="https://${PREVIEW_WORKER_NAME}.${SUBDOMAIN}.workers.dev"
+          elif [ -n "$SUBDOMAIN" ]; then
+            DERIVED_URL="https://${PRODUCTION_WORKER_NAME}.${SUBDOMAIN}.workers.dev"
           fi
 
-          TARGET_URL="$(printf '%s' "$TARGET_URL" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-          TARGET_URL="${TARGET_URL%/}"
-          if [ -z "$TARGET_URL" ]; then
-            echo "Missing APP_BASE_URL secret." >&2
+          CANDIDATES=()
+          if [ -n "$DERIVED_URL" ]; then
+            CANDIDATES+=("$DERIVED_URL")
+          fi
+          if [ "$TARGET_ENVIRONMENT" = "production" ] && [ -n "$APP_BASE_URL_TRIMMED" ]; then
+            if [ "$APP_BASE_URL_TRIMMED" != "$DERIVED_URL" ]; then
+              CANDIDATES+=("$APP_BASE_URL_TRIMMED")
+            fi
+          fi
+
+          if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+            echo "Unable to resolve target URL (missing APP_BASE_URL and unable to compute workers.dev URL)." >&2
             exit 1
           fi
-          if ! printf '%s' "$TARGET_URL" | grep -Eq '^https?://'; then
-            echo "Target URL must start with http:// or https://." >&2
+
+          # Preflight: the reindex route returns 401 (Unauthorized) when the Worker
+          # is configured with a token but the request omits Authorization. If we
+          # get 503, we're hitting a Worker that isn't configured for manual
+          # reindexing yet (often due to targeting the wrong Worker name/URL).
+          TARGET_URL=""
+          PREFLIGHT_SUMMARY=""
+          for candidate in "${CANDIDATES[@]}"; do
+            candidate_trimmed="$(printf '%s' "$candidate" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+            candidate_trimmed="${candidate_trimmed%/}"
+            if [ -z "$candidate_trimmed" ]; then
+              continue
+            fi
+            if ! printf '%s' "$candidate_trimmed" | grep -Eq '^https?://'; then
+              PREFLIGHT_SUMMARY="${PREFLIGHT_SUMMARY}\n- ${candidate_trimmed}: invalid URL (must start with http:// or https://)"
+              continue
+            fi
+
+            RESPONSE_FILE="$(mktemp)"
+            HTTP_STATUS="$(curl --silent --show-error \
+              --retry 2 \
+              --retry-all-errors \
+              --retry-delay 1 \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --output "$RESPONSE_FILE" \
+              --write-out '%{http_code}' \
+              --request POST \
+              --url "$candidate_trimmed/internal/workshop-index/reindex" \
+              || true
+            )"
+
+            RESPONSE_BODY="$(<"$RESPONSE_FILE")"
+            rm -f "$RESPONSE_FILE"
+
+            if [ -z "${HTTP_STATUS:-}" ]; then
+              HTTP_STATUS="000"
+            fi
+
+            ERROR_MESSAGE=""
+            if printf '%s' "$RESPONSE_BODY" | jq -e . >/dev/null 2>&1; then
+              ERROR_MESSAGE="$(printf '%s' "$RESPONSE_BODY" | jq -r '.error // empty' 2>/dev/null || true)"
+            fi
+
+            if [ "$HTTP_STATUS" = "401" ]; then
+              TARGET_URL="$candidate_trimmed"
+              break
+            fi
+
+            if [ -n "$ERROR_MESSAGE" ]; then
+              PREFLIGHT_SUMMARY="${PREFLIGHT_SUMMARY}\n- ${candidate_trimmed}: HTTP ${HTTP_STATUS} (${ERROR_MESSAGE})"
+            else
+              PREFLIGHT_SUMMARY="${PREFLIGHT_SUMMARY}\n- ${candidate_trimmed}: HTTP ${HTTP_STATUS}"
+            fi
+          done
+
+          if [ -z "$TARGET_URL" ]; then
+            echo "Unable to find a target URL with reindex enabled/configured." >&2
+            echo "" >&2
+            echo "Tried:" >&2
+            printf '%b\n' "$PREFLIGHT_SUMMARY" >&2
+            echo "" >&2
+            echo "If the Worker responds with 503 (token not configured), ensure the deploy workflow has synced WORKSHOP_INDEX_ADMIN_TOKEN to the Worker you're calling." >&2
             exit 1
           fi
 
@@ -187,6 +302,7 @@ jobs:
             )
 
             RESPONSE_BODY=$(<"$RESPONSE_FILE")
+            rm -f "$RESPONSE_FILE"
             echo "Reindex response (iteration $ITERATION): $RESPONSE_BODY"
 
             if ! printf '%s' "$RESPONSE_BODY" | jq -e . >/dev/null; then

@@ -102,7 +102,16 @@ To load workshop content into D1 + Vectorize from CI, run the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, reindex fails fast with an explicit
   `400` response naming missing workshops
+- the workflow resolves a target base URL in this order:
+  - preferred: the environment-specific `workers.dev` URL derived from
+    `wrangler.jsonc` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`)
+  - fallback (production only): `APP_BASE_URL`
 - target URLs must be absolute `http://` or `https://` base URLs
+- before indexing, the workflow preflights
+  `POST /internal/workshop-index/reindex` without `Authorization`:
+  - `401` means the Worker has `WORKSHOP_INDEX_ADMIN_TOKEN` configured
+    (expected)
+  - `503` means the Worker is missing `WORKSHOP_INDEX_ADMIN_TOKEN`
 - the workflow retries transient network failures when calling the protected
   reindex endpoint
 - reindex HTTP calls use connect/request timeouts to avoid hanging CI jobs

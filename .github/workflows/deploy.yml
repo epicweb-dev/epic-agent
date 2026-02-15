@@ -176,13 +176,13 @@ jobs:
         run: |
           PREVIEW_WORKER_NAME="epic-agent-preview"
           if [ -n "$COOKIE_SECRET" ]; then
-            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --name "$PREVIEW_WORKER_NAME"
           fi
 
       - name: 🔐 Sync Cloudflare Secrets (Preview)
@@ -193,13 +193,13 @@ jobs:
         run: |
           PREVIEW_WORKER_NAME="epic-agent-pr-${{ github.event.pull_request.number }}"
           if [ -n "$COOKIE_SECRET" ]; then
-            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --name "$PREVIEW_WORKER_NAME"
           fi
 
       - name: 🗄️ Apply D1 Migrations
