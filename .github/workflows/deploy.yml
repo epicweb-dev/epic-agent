@@ -186,7 +186,7 @@ jobs:
           fi
 
       - name: 🔐 Sync Cloudflare Secrets (Preview)
-        if:
+        if: >-
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
@@ -207,17 +207,17 @@ jobs:
         run: bun ./wrangler-env.ts d1 migrations apply epic-agent --remote
 
       - name: 🗄️ Apply D1 Migrations (Preview)
-        if:
+        if: >-
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
-        run:
+        run: >-
           bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
           preview
 
       - name: 🗄️ Apply D1 Migrations (Stable Preview)
         if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
-        run:
+        run: >-
           bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
           preview
 
@@ -229,13 +229,13 @@ jobs:
         run: bun ./wrangler-env.ts deploy
 
       - name: ☁️ Deploy Preview to Cloudflare Workers
-        if:
+        if: >-
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
         env:
           CLOUDFLARE_ENV: preview
-          PREVIEW_WORKER_NAME:
+          PREVIEW_WORKER_NAME: >-
             epic-agent-pr-${{ github.event.pull_request.number }}
         run: bun ./wrangler-env.ts deploy --name "$PREVIEW_WORKER_NAME"
 
@@ -246,13 +246,13 @@ jobs:
         run: bun ./wrangler-env.ts deploy --name epic-agent-preview
 
       - name: 💬 Comment Preview Deployment
-        if:
+        if: >-
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
         uses: actions/github-script@v7
         env:
-          PREVIEW_WORKER_NAME:
+          PREVIEW_WORKER_NAME: >-
             epic-agent-pr-${{ github.event.pull_request.number }}
         with:
           script: |
@@ -313,7 +313,7 @@ jobs:
   cleanup-preview:
     runs-on: ubuntu-latest
     name: 🧽 Cleanup Preview
-    if:
+    if: >-
       github.event_name == 'pull_request' && github.event.action == 'closed' &&
       github.event.pull_request.head.repo.fork == false &&
       secrets.CLOUDFLARE_API_TOKEN != ''
