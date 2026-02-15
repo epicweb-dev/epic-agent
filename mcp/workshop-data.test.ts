@@ -15,6 +15,61 @@ type IndexedWorkshopRow = {
 	product?: string | null
 }
 
+function createReplaceWorkshopIndexFixture() {
+	return {
+		runId: 'run-123',
+		workshop: {
+			workshopSlug: 'mcp-fundamentals',
+			title: 'MCP Fundamentals',
+			product: 'epicweb',
+			repoOwner: 'epicweb-dev',
+			repoName: 'mcp-fundamentals',
+			defaultBranch: 'main',
+			sourceSha: 'abc123',
+			exerciseCount: 1,
+			hasDiffs: true,
+		},
+		exercises: [
+			{
+				exerciseNumber: 1,
+				title: 'Exercise 1',
+				stepCount: 1,
+			},
+		],
+		steps: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				problemDir: 'exercises/01.problem',
+				solutionDir: 'exercises/01.solution',
+				hasDiff: true,
+			},
+		],
+		sections: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				sectionOrder: 1,
+				sectionKind: 'diff-hunk',
+				label: 'Diff chunk',
+				sourcePath: 'src/index.ts',
+				content: '@@ -1 +1 @@',
+				isDiff: true,
+			},
+		],
+		sectionChunks: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				sectionOrder: 1,
+				chunkIndex: 0,
+				content: '@@ -1 +1 @@',
+				vectorId: 'run-123:mcp-fundamentals:1:0',
+			},
+		],
+	}
+}
+
 test('listStoredVectorIdsForWorkshop normalizes and dedupes ids', async () => {
 	let observedWorkshop = ''
 	const db = {
@@ -172,58 +227,10 @@ test('replaceWorkshopIndex does not issue SQL transaction statements', async () 
 		},
 	} as unknown as D1Database
 
+	const fixture = createReplaceWorkshopIndexFixture()
 	await replaceWorkshopIndex({
 		db,
-		runId: 'run-123',
-		workshop: {
-			workshopSlug: 'mcp-fundamentals',
-			title: 'MCP Fundamentals',
-			product: 'epicweb',
-			repoOwner: 'epicweb-dev',
-			repoName: 'mcp-fundamentals',
-			defaultBranch: 'main',
-			sourceSha: 'abc123',
-			exerciseCount: 1,
-			hasDiffs: true,
-		},
-		exercises: [
-			{
-				exerciseNumber: 1,
-				title: 'Exercise 1',
-				stepCount: 1,
-			},
-		],
-		steps: [
-			{
-				exerciseNumber: 1,
-				stepNumber: 1,
-				problemDir: 'exercises/01.problem',
-				solutionDir: 'exercises/01.solution',
-				hasDiff: true,
-			},
-		],
-		sections: [
-			{
-				exerciseNumber: 1,
-				stepNumber: 1,
-				sectionOrder: 1,
-				sectionKind: 'diff-hunk',
-				label: 'Diff chunk',
-				sourcePath: 'src/index.ts',
-				content: '@@ -1 +1 @@',
-				isDiff: true,
-			},
-		],
-		sectionChunks: [
-			{
-				exerciseNumber: 1,
-				stepNumber: 1,
-				sectionOrder: 1,
-				chunkIndex: 0,
-				content: '@@ -1 +1 @@',
-				vectorId: 'run-123:mcp-fundamentals:1:0',
-			},
-		],
+		...fixture,
 	})
 
 	expect(execCalls).toEqual([])
@@ -236,4 +243,47 @@ test('replaceWorkshopIndex does not issue SQL transaction statements', async () 
 				sql.includes('ROLLBACK'),
 		),
 	).toBe(false)
+})
+
+test('replaceWorkshopIndex clears workshop scope after partial write failures', async () => {
+	const executedSql: Array<string> = []
+	const db = {
+		prepare(sql: string) {
+			return {
+				bind(..._params: Array<unknown>) {
+					executedSql.push(sql)
+					return {
+						async run() {
+							if (sql.includes('INSERT INTO indexed_steps')) {
+								throw new Error('step insert failed')
+							}
+							return {}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+
+	const fixture = createReplaceWorkshopIndexFixture()
+	await expect(
+		replaceWorkshopIndex({
+			db,
+			...fixture,
+		}),
+	).rejects.toThrow('step insert failed')
+
+	expect(
+		executedSql.filter(
+			(sql) =>
+				sql.includes('DELETE FROM indexed_') &&
+				sql.includes('workshop_slug = ?'),
+		),
+	).toHaveLength(10)
+	expect(
+		executedSql.filter((sql) => sql.includes('DELETE FROM indexed_sections')),
+	).toHaveLength(2)
+	expect(
+		executedSql.filter((sql) => sql.includes('DELETE FROM indexed_workshops')),
+	).toHaveLength(2)
 })

@@ -29,6 +29,8 @@ App access pattern:
 - workshop index replacement avoids raw `BEGIN/COMMIT` SQL transaction
   statements (unsupported in Workers SQLite runtime) and relies on D1 prepared
   statement writes instead
+- if a write fails mid-replacement, reindex performs a best-effort
+  workshop-scope cleanup pass to avoid leaving partial indexed rows
 
 ## KV (`OAUTH_KV`)
 
