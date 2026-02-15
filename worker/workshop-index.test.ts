@@ -64,6 +64,35 @@ test('workshop index route validates payload shape', async () => {
 	expect(response.status).toBe(400)
 })
 
+test('workshop index route rejects oversized workshop filters', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: Array.from(
+					{ length: 101 },
+					(_, index) => `workshop-${index}`,
+				),
+			}),
+		}),
+		createEnv(),
+	)
+
+	expect(response.status).toBe(400)
+	const payload = await response.json()
+	expect(payload).toMatchObject({
+		ok: false,
+		error: 'Invalid reindex payload.',
+	})
+	expect(payload.details).toEqual(
+		expect.arrayContaining([expect.stringContaining('<=100')]),
+	)
+})
+
 test('workshop index route returns reindex summary when authorized', async () => {
 	let capturedWorkshops: Array<string> | undefined
 	const response = await handleWorkshopIndexRequest(

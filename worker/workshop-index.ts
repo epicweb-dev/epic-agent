@@ -4,7 +4,7 @@ import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
 
 const reindexBodySchema = z.object({
-	workshops: z.array(z.string().trim().min(1)).optional(),
+	workshops: z.array(z.string().trim().min(1)).max(100).optional(),
 })
 
 function normalizeWorkshops(workshops: Array<string> | undefined) {
