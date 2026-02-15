@@ -1077,6 +1077,36 @@ test(
 )
 
 test(
+	'manual reindex endpoint rejects missing bearer tokens',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+
+		const response = await fetch(
+			new URL('/internal/workshop-index/reindex', server.origin),
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: '{}',
+			},
+		)
+
+		expect(response.status).toBe(401)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: string
+		}
+		expect(payload).toEqual({
+			ok: false,
+			error: 'Unauthorized',
+		})
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
 	'manual reindex endpoint rejects oversized payloads',
 	async () => {
 		await using database = await createTestDatabase()
