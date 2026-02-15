@@ -1388,11 +1388,26 @@ export async function runWorkshopReindex({
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
-		await markIndexRunFailed({
-			db,
-			runId,
-			errorMessage: message.slice(0, 4000),
-		})
+		try {
+			await markIndexRunFailed({
+				db,
+				runId,
+				errorMessage: message.slice(0, 4000),
+			})
+		} catch (markFailedError) {
+			const markFailedMessage =
+				markFailedError instanceof Error
+					? markFailedError.message
+					: String(markFailedError)
+			console.error(
+				'workshop-reindex-failed-status-write-error',
+				JSON.stringify({
+					runId,
+					originalError: message,
+					markFailedError: markFailedMessage,
+				}),
+			)
+		}
 		console.error(
 			'workshop-reindex-failed',
 			JSON.stringify({

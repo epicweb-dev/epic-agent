@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import {
 	listIndexedWorkshops,
 	listStoredVectorIdsForWorkshop,
+	replaceWorkshopIndex,
 } from './workshop-data.ts'
 
 type IndexedWorkshopRow = {
@@ -147,4 +148,92 @@ test('listIndexedWorkshops resets invalid cursor offsets to zero', async () => {
 	expect(observedLimit).toBe(6)
 	expect(result.workshops).toEqual([])
 	expect(result.nextCursor).toBeNull()
+})
+
+test('replaceWorkshopIndex does not issue SQL transaction statements', async () => {
+	const executedSql: Array<string> = []
+	const execCalls: Array<string> = []
+	const db = {
+		exec(sql: string) {
+			execCalls.push(sql)
+			return Promise.resolve()
+		},
+		prepare(sql: string) {
+			return {
+				bind(..._params: Array<unknown>) {
+					executedSql.push(sql)
+					return {
+						async run() {
+							return {}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+
+	await replaceWorkshopIndex({
+		db,
+		runId: 'run-123',
+		workshop: {
+			workshopSlug: 'mcp-fundamentals',
+			title: 'MCP Fundamentals',
+			product: 'epicweb',
+			repoOwner: 'epicweb-dev',
+			repoName: 'mcp-fundamentals',
+			defaultBranch: 'main',
+			sourceSha: 'abc123',
+			exerciseCount: 1,
+			hasDiffs: true,
+		},
+		exercises: [
+			{
+				exerciseNumber: 1,
+				title: 'Exercise 1',
+				stepCount: 1,
+			},
+		],
+		steps: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				problemDir: 'exercises/01.problem',
+				solutionDir: 'exercises/01.solution',
+				hasDiff: true,
+			},
+		],
+		sections: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				sectionOrder: 1,
+				sectionKind: 'diff-hunk',
+				label: 'Diff chunk',
+				sourcePath: 'src/index.ts',
+				content: '@@ -1 +1 @@',
+				isDiff: true,
+			},
+		],
+		sectionChunks: [
+			{
+				exerciseNumber: 1,
+				stepNumber: 1,
+				sectionOrder: 1,
+				chunkIndex: 0,
+				content: '@@ -1 +1 @@',
+				vectorId: 'run-123:mcp-fundamentals:1:0',
+			},
+		],
+	})
+
+	expect(execCalls).toEqual([])
+	expect(executedSql).toHaveLength(10)
+	expect(
+		executedSql.some(
+			(sql) =>
+				sql.includes('BEGIN') ||
+				sql.includes('COMMIT') ||
+				sql.includes('ROLLBACK'),
+		),
+	).toBe(false)
 })

@@ -557,6 +557,7 @@ async function stopProcess(proc: ReturnType<typeof Bun.spawn>) {
 async function startDevServer(persistDir: string) {
 	const port = await getPort({ host: '127.0.0.1' })
 	const origin = `http://127.0.0.1:${port}`
+	const wranglerLogLevel = runWorkshopNetworkTests ? 'info' : 'error'
 	const devCommand: Array<string> = [
 		bunBin,
 		'x',
@@ -573,7 +574,7 @@ async function startDevServer(persistDir: string) {
 		persistDir,
 		'--show-interactive-dev-session=false',
 		'--log-level',
-		'error',
+		wranglerLogLevel,
 	]
 	const runtimeGitHubToken = process.env.GITHUB_TOKEN?.trim()
 	if (runtimeGitHubToken) {
@@ -597,6 +598,7 @@ async function startDevServer(persistDir: string) {
 
 	return {
 		origin,
+		getCapturedOutput: () => formatOutput(getStdout(), getStderr()),
 		[Symbol.asyncDispose]: async () => {
 			await stopProcess(proc)
 		},
@@ -1046,7 +1048,7 @@ networkTest(
 		}
 		if (reindexResponse.status !== 200) {
 			throw new Error(
-				`Manual reindex failed with status ${reindexResponse.status}: ${reindexPayload.error ?? 'unknown error'}`,
+				`Manual reindex failed with status ${reindexResponse.status}: ${reindexPayload.error ?? 'unknown error'}${server.getCapturedOutput()}`,
 			)
 		}
 		expect(reindexPayload.ok).toBe(true)

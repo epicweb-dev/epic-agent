@@ -26,6 +26,9 @@ App access pattern:
   database calls
 - MCP retrieval/indexing logic uses direct prepared statements for bulk index
   writes and ordered section reads
+- workshop index replacement avoids raw `BEGIN/COMMIT` SQL transaction
+  statements (unsupported in Workers SQLite runtime) and relies on D1 prepared
+  statement writes instead
 
 ## KV (`OAUTH_KV`)
 

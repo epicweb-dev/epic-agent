@@ -102,6 +102,13 @@ export async function handleWorkshopIndexRequest(
 		})
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
+		console.error(
+			'workshop-index-route-reindex-failed',
+			JSON.stringify({
+				error: message,
+				stack: error instanceof Error ? error.stack : undefined,
+			}),
+		)
 		return Response.json(
 			{
 				ok: false,
