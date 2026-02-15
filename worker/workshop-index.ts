@@ -22,6 +22,114 @@ const batchSizeMinErrorMessage = 'batchSize must be at least 1.'
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
+function stripLeadingBom(value: string) {
+	return value.startsWith('\uFEFF') ? value.slice(1) : value
+}
+
+function looksLikeJson(value: string) {
+	const trimmed = value.trim()
+	if (trimmed.length === 0) return false
+	const firstChar = trimmed[0]
+	return firstChar === '{' || firstChar === '['
+}
+
+function parseBatchSizeFromString(value: string) {
+	const trimmed = value.trim()
+	if (trimmed.length === 0) return undefined
+	const parsed = Number(trimmed)
+	if (!Number.isFinite(parsed)) return undefined
+	// Mirror the workflow behavior: treat "5.0" like 5, but preserve non-integers
+	// so the schema can reject them with a clear message.
+	const floored = Math.floor(parsed)
+	return floored === parsed ? floored : parsed
+}
+
+function tryParseJsonBody(value: string): { ok: true; body: unknown } | { ok: false } {
+	try {
+		const parsed = JSON.parse(value) as unknown
+		if (typeof parsed === 'string' && looksLikeJson(parsed)) {
+			try {
+				return { ok: true, body: JSON.parse(parsed) as unknown }
+			} catch {
+				// Fall through and let the schema handle the string body.
+			}
+		}
+		return { ok: true, body: parsed }
+	} catch {
+		return { ok: false }
+	}
+}
+
+function tryParseFormBody(value: string): { ok: true; body: unknown } | { ok: false } {
+	// Basic heuristic: only treat input as form-encoded if it contains obvious
+	// separators. This avoids mis-parsing arbitrary text.
+	if (!value.includes('=') && !value.includes('&')) return { ok: false }
+	const params = new URLSearchParams(value)
+	if (Array.from(params.keys()).length === 0) return { ok: false }
+
+	const payload = params.get('payload')?.trim()
+	if (payload) {
+		const parsedPayload = tryParseJsonBody(payload)
+		if (parsedPayload.ok) {
+			return parsedPayload
+		}
+	}
+
+	const body: Record<string, unknown> = {}
+
+	const workshopValues = [
+		...params.getAll('workshops'),
+		...params.getAll('workshops[]'),
+	]
+		.map((workshop) => workshop.trim())
+		.filter(Boolean)
+	if (workshopValues.length === 1) {
+		// Allow a single string value (comma/newline-separated) so the zod
+		// preprocess path still works.
+		body.workshops = workshopValues[0]
+	} else if (workshopValues.length > 1) {
+		body.workshops = workshopValues
+	}
+
+	const cursor = params.get('cursor')?.trim()
+	if (cursor) body.cursor = cursor
+
+	const batchSizeRaw = params.get('batchSize')
+	if (typeof batchSizeRaw === 'string') {
+		const batchSize = parseBatchSizeFromString(batchSizeRaw)
+		if (typeof batchSize !== 'undefined') {
+			body.batchSize = batchSize
+		} else if (batchSizeRaw.trim().length > 0) {
+			// Preserve invalid values so the schema can reject them.
+			body.batchSize = batchSizeRaw
+		}
+	}
+
+	return Object.keys(body).length > 0 ? { ok: true, body } : { ok: false }
+}
+
+function parseReindexRequestBody(
+	requestBody: string,
+): { ok: true; body: unknown } | { ok: false } {
+	const normalized = stripLeadingBom(requestBody)
+	const trimmed = normalized.trim()
+	if (trimmed.length === 0) {
+		return { ok: true, body: {} }
+	}
+
+	const parsedJson = tryParseJsonBody(trimmed)
+	if (parsedJson.ok) return parsedJson
+
+	// Handle common shell quoting mistakes: "'{...}'".
+	if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length > 1) {
+		const inner = trimmed.slice(1, -1).trim()
+		const innerParsed = tryParseJsonBody(inner)
+		if (innerParsed.ok) return innerParsed
+	}
+
+	return tryParseFormBody(trimmed)
+}
+
 const reindexBodySchema = z.object({
 	workshops: z
 		.preprocess((value) => {
@@ -152,11 +260,11 @@ export async function handleWorkshopIndexRequest(
 		return oversizedReindexPayloadResponse([requestBodyMaxErrorMessage])
 	}
 	if (requestBody.trim().length > 0) {
-		try {
-			body = JSON.parse(requestBody) as unknown
-		} catch {
+		const parsedRequestBody = parseReindexRequestBody(requestBody)
+		if (!parsedRequestBody.ok) {
 			return invalidReindexPayloadResponse(['Request body must be valid JSON.'])
 		}
+		body = parsedRequestBody.body
 	}
 	const parsedBody = reindexBodySchema.safeParse(body)
 	if (!parsedBody.success) {

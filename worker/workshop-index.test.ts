@@ -132,6 +132,141 @@ test('workshop index route rejects malformed json payloads', async () => {
 	})
 })
 
+test('workshop index route strips a leading BOM before parsing JSON', async () => {
+	let capturedBatchSize: number | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: `\uFEFF${JSON.stringify({ batchSize: 5 })}`,
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ batchSize }) => {
+				capturedBatchSize = batchSize
+				return {
+					runId: 'run-123',
+					workshopCount: 0,
+					exerciseCount: 0,
+					stepCount: 0,
+					sectionCount: 0,
+					sectionChunkCount: 0,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedBatchSize).toBe(5)
+})
+
+test('workshop index route accepts single-quoted JSON bodies', async () => {
+	let capturedBatchSize: number | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: `'${JSON.stringify({ batchSize: 5 })}'`,
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ batchSize }) => {
+				capturedBatchSize = batchSize
+				return {
+					runId: 'run-123',
+					workshopCount: 0,
+					exerciseCount: 0,
+					stepCount: 0,
+					sectionCount: 0,
+					sectionChunkCount: 0,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedBatchSize).toBe(5)
+})
+
+test('workshop index route accepts JSON string bodies containing JSON', async () => {
+	let capturedBatchSize: number | undefined
+	const doubleEncoded = JSON.stringify(JSON.stringify({ batchSize: 5 }))
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: doubleEncoded,
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ batchSize }) => {
+				capturedBatchSize = batchSize
+				return {
+					runId: 'run-123',
+					workshopCount: 0,
+					exerciseCount: 0,
+					stepCount: 0,
+					sectionCount: 0,
+					sectionChunkCount: 0,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedBatchSize).toBe(5)
+})
+
+test('workshop index route accepts urlencoded form bodies as a fallback', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	let capturedCursor: string | undefined
+	let capturedBatchSize: number | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				workshops: 'MCP-FUNDAMENTALS,Advanced-TypeScript',
+				cursor: 'cursor-value',
+				batchSize: '5',
+			}).toString(),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops, cursor, batchSize }) => {
+				capturedWorkshops = onlyWorkshops
+				capturedCursor = cursor
+				capturedBatchSize = batchSize
+				return {
+					runId: 'run-123',
+					workshopCount: 0,
+					exerciseCount: 0,
+					stepCount: 0,
+					sectionCount: 0,
+					sectionChunkCount: 0,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toEqual(['mcp-fundamentals', 'advanced-typescript'])
+	expect(capturedCursor).toBe('cursor-value')
+	expect(capturedBatchSize).toBe(5)
+})
+
 test('workshop index route rejects oversized request bodies', async () => {
 	let reindexCalled = false
 	const response = await handleWorkshopIndexRequest(
