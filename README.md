@@ -63,11 +63,12 @@ Request → worker/index.ts
 
 ## Documentation
 
-| Document                                                           | Description                          |
-| ------------------------------------------------------------------ | ------------------------------------ |
-| [`docs/getting-started.md`](./docs/getting-started.md)             | Setup, environment variables, deploy |
-| [`docs/environment-variables.md`](./docs/environment-variables.md) | Adding new env vars                  |
-| [`docs/agents/setup.md`](./docs/agents/setup.md)                   | Local development and verification   |
+| Document                                                                                 | Description                              |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------- |
+| [`docs/getting-started.md`](./docs/getting-started.md)                                   | Setup, environment variables, deploy     |
+| [`docs/environment-variables.md`](./docs/environment-variables.md)                       | Adding new env vars                      |
+| [`docs/agents/setup.md`](./docs/agents/setup.md)                                         | Local development and verification       |
+| [`docs/architecture/mcp-retrieval-tools.md`](./docs/architecture/mcp-retrieval-tools.md) | MCP workshop retrieval and indexing flow |
 
 ---
 
