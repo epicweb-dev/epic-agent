@@ -3,6 +3,7 @@ import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 
 export const workshopIndexRoutePath = '/internal/workshop-index/reindex'
 export const workshopFilterMaxCount = 100
+const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
@@ -115,9 +116,7 @@ export async function handleWorkshopIndexRequest(
 		normalizedWorkshops &&
 		normalizedWorkshops.length > workshopFilterMaxCount
 	) {
-		return invalidReindexPayloadResponse([
-			'workshops must include at most 100 entries.',
-		])
+		return invalidReindexPayloadResponse([workshopFilterMaxErrorMessage])
 	}
 
 	try {

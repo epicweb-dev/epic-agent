@@ -13,6 +13,8 @@ function createEnv(overrides: Partial<Env> = {}) {
 	} as Env
 }
 
+const workshopFilterMaxErrorMessage = `workshops must include at most ${workshopFilterMaxCount} entries.`
+
 test('workshop index route rejects non-POST methods', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
@@ -125,7 +127,7 @@ test('workshop index route rejects oversized workshop filters', async () => {
 	expect(payload).toEqual({
 		ok: false,
 		error: 'Invalid reindex payload.',
-		details: ['workshops must include at most 100 entries.'],
+		details: [workshopFilterMaxErrorMessage],
 	})
 })
 
@@ -152,7 +154,7 @@ test('workshop index route rejects oversized string workshop filters', async () 
 	expect(payload).toEqual({
 		ok: false,
 		error: 'Invalid reindex payload.',
-		details: ['workshops must include at most 100 entries.'],
+		details: [workshopFilterMaxErrorMessage],
 	})
 })
 
