@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, closed]
 
 concurrency:
   group: deploy-${{ github.workflow }}-${{ github.ref }}
@@ -20,6 +21,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     name: 🧹 Lint
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
@@ -38,6 +40,7 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     name: 🧪 Typecheck
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
@@ -56,6 +59,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     name: ✅ Bun Tests
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
@@ -74,6 +78,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     name: 🎭 E2E
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
@@ -106,6 +111,7 @@ jobs:
   mcp-e2e:
     runs-on: ubuntu-latest
     name: 🧩 MCP E2E
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
@@ -127,6 +133,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: 🚀 Deploy
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     needs:
       - lint
       - typecheck
@@ -135,9 +142,9 @@ jobs:
       - mcp-e2e
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
       APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-      APP_BASE_URL_PREVIEW: ${{ secrets.APP_BASE_URL_PREVIEW }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
     steps:
@@ -164,24 +171,37 @@ jobs:
             echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env production
           fi
 
+      - name: 🔐 Sync Cloudflare Secrets (Stable Preview)
+        if:
+          github.ref == 'refs/heads/main' &&
+          env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          PREVIEW_WORKER_NAME="epic-agent-preview"
+          if [ -n "$COOKIE_SECRET" ]; then
+            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview --name "$PREVIEW_WORKER_NAME"
+          fi
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+          fi
+          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
+          fi
+
       - name: 🔐 Sync Cloudflare Secrets (Preview)
         if:
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
         run: |
-          PREVIEW_APP_BASE_URL="${APP_BASE_URL_PREVIEW:-$APP_BASE_URL}"
+          PREVIEW_WORKER_NAME="epic-agent-pr-${{ github.event.pull_request.number }}"
           if [ -n "$COOKIE_SECRET" ]; then
-            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview
-          fi
-          if [ -n "$PREVIEW_APP_BASE_URL" ]; then
-            echo "$PREVIEW_APP_BASE_URL" | bunx wrangler secret put APP_BASE_URL --env preview
+            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env preview --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview
+            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
           fi
           if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview
+            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env preview --name "$PREVIEW_WORKER_NAME"
           fi
 
       - name: 🗄️ Apply D1 Migrations
@@ -195,9 +215,18 @@ jobs:
           env.CLOUDFLARE_API_TOKEN != ''
         run: bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env preview
 
+      - name: 🗄️ Apply D1 Migrations (Stable Preview)
+        if:
+          github.ref == 'refs/heads/main' &&
+          env.CLOUDFLARE_API_TOKEN != ''
+        run: bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env preview
+
+      - name: 🏗️ Build
+        run: bun run build
+
       - name: ☁️ Deploy to Cloudflare Workers
         if: github.ref == 'refs/heads/main'
-        run: bun run deploy
+        run: bun ./wrangler-env.ts deploy
 
       - name: ☁️ Deploy Preview to Cloudflare Workers
         if:
@@ -206,7 +235,16 @@ jobs:
           env.CLOUDFLARE_API_TOKEN != ''
         env:
           CLOUDFLARE_ENV: preview
-        run: bun run deploy
+          PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
+        run: bun ./wrangler-env.ts deploy --name "$PREVIEW_WORKER_NAME"
+
+      - name: ☁️ Deploy Stable Preview to Cloudflare Workers
+        if:
+          github.ref == 'refs/heads/main' &&
+          env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          CLOUDFLARE_ENV: preview
+        run: bun ./wrangler-env.ts deploy --name epic-agent-preview
 
       - name: 💬 Comment Preview Deployment
         if:
@@ -214,19 +252,126 @@ jobs:
           github.event.pull_request.head.repo.fork == false &&
           env.CLOUDFLARE_API_TOKEN != ''
         uses: actions/github-script@v7
+        env:
+          PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
         with:
           script: |
             const marker = '<!-- preview-deploy-comment -->'
-            const previewUrl = process.env.APP_BASE_URL_PREVIEW || process.env.APP_BASE_URL || ''
+            const previewWorkerName = process.env.PREVIEW_WORKER_NAME || ''
+            const token = process.env.CLOUDFLARE_API_TOKEN || ''
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
+
+            let previewUrl = ''
+            if (token && accountId && previewWorkerName) {
+              const response = await fetch(
+                `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                },
+              )
+              const data = await response.json()
+              const subdomain = data?.result?.subdomain
+              if (response.ok && typeof subdomain === 'string' && subdomain.length > 0) {
+                previewUrl = `https://${previewWorkerName}.${subdomain}.workers.dev`
+              }
+            }
             const lines = [
               marker,
               '## 🚀 Preview deployment updated',
               '',
-              previewUrl
-                ? `Preview URL: ${previewUrl}`
-                : 'Preview deployment completed for the Cloudflare `preview` environment.',
+              previewUrl ? `Preview URL: ${previewUrl}` : `Preview Worker: \`${previewWorkerName}\``,
               '',
               `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ]
+            const body = lines.join('\n')
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const existing = comments.find((comment) => comment.body?.includes(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              })
+            }
+
+  cleanup-preview:
+    runs-on: ubuntu-latest
+    name: 🧽 Cleanup Preview
+    if:
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.fork == false &&
+      secrets.CLOUDFLARE_API_TOKEN != ''
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🧰 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 📥 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 🗑️ Delete PR Preview Worker
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ENV: preview
+        run: bunx wrangler delete "$PREVIEW_WORKER_NAME" --env preview --force
+
+      - name: 💬 Comment Preview Cleanup
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- preview-deploy-comment -->'
+            const previewWorkerName = process.env.PREVIEW_WORKER_NAME || ''
+            const token = process.env.CLOUDFLARE_API_TOKEN || ''
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
+
+            let previewUrl = ''
+            if (token && accountId && previewWorkerName) {
+              const response = await fetch(
+                `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                },
+              )
+              const data = await response.json()
+              const subdomain = data?.result?.subdomain
+              if (response.ok && typeof subdomain === 'string' && subdomain.length > 0) {
+                previewUrl = `https://${previewWorkerName}.${subdomain}.workers.dev`
+              }
+            }
+
+            const lines = [
+              marker,
+              '## 🧽 Preview deployment cleaned up',
+              '',
+              previewUrl ? `Preview URL removed: ${previewUrl}` : `Preview Worker removed: \`${previewWorkerName}\``,
             ]
             const body = lines.join('\n')
 

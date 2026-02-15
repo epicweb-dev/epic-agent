@@ -71,13 +71,19 @@ bun ./docs/post-download.ts --guided
 
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
-- `CLOUDFLARE_ACCOUNT_ID` (recommended for reliable token-based Wrangler CI
-  commands)
+- `CLOUDFLARE_ACCOUNT_ID` (required; used by CI to compute workers.dev preview
+  URLs and for reliable token-based Wrangler CI commands)
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
 - `APP_BASE_URL` (production app URL)
-- `APP_BASE_URL_PREVIEW` (optional preview URL for PR preview deploys)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected workshop reindex calls)
 - `GITHUB_TOKEN` (optional but recommended for higher indexing throughput)
+
+How to find `CLOUDFLARE_ACCOUNT_ID`:
+
+- Cloudflare dashboard: open any Workers page and copy the id from the URL
+  segment `accounts/<account-id>/...`.
+- Wrangler CLI (after `bunx wrangler login`): run `bunx wrangler whoami` and use
+  the printed `Account ID`.
 
 3. Deploy:
 

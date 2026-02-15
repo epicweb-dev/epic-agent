@@ -53,8 +53,15 @@ Quick notes for getting a local epic-agent environment running.
 ## Remote Cloudflare commands with API tokens
 
 When running Wrangler remote commands with `CLOUDFLARE_API_TOKEN`, also set
-`CLOUDFLARE_ACCOUNT_ID` explicitly to avoid account membership lookup failures
-in non-interactive environments.
+`CLOUDFLARE_ACCOUNT_ID` explicitly. CI also uses it to compute workers.dev
+preview URLs.
+
+How to find `CLOUDFLARE_ACCOUNT_ID`:
+
+- Cloudflare dashboard: open any Workers page and copy the id from the URL
+  segment `accounts/<account-id>/...`.
+- Wrangler CLI (after `bunx wrangler login`): run `bunx wrangler whoami` and use
+  the printed `Account ID`.
 
 ## Remix package docs
 

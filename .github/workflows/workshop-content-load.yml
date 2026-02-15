@@ -40,12 +40,32 @@ jobs:
         env:
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-          APP_BASE_URL_PREVIEW: ${{ secrets.APP_BASE_URL_PREVIEW }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
 
           if [ "$TARGET_ENVIRONMENT" = "preview" ]; then
-            TARGET_URL="${APP_BASE_URL_PREVIEW:-$APP_BASE_URL}"
+            if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+              echo "Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret (required to determine preview URL)." >&2
+              exit 1
+            fi
+
+            SUBDOMAIN=$(
+              curl --silent --show-error \
+                --request GET \
+                --url "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain" \
+                --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                --header 'Content-Type: application/json' \
+                | jq -r '.result.subdomain // empty'
+            )
+
+            if [ -z "$SUBDOMAIN" ]; then
+              echo "Unable to resolve workers.dev subdomain from Cloudflare API." >&2
+              exit 1
+            fi
+
+            TARGET_URL="https://epic-agent-preview.${SUBDOMAIN}.workers.dev"
           else
             TARGET_URL="$APP_BASE_URL"
           fi
@@ -53,7 +73,7 @@ jobs:
           TARGET_URL="$(printf '%s' "$TARGET_URL" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
           TARGET_URL="${TARGET_URL%/}"
           if [ -z "$TARGET_URL" ]; then
-            echo "Missing APP_BASE_URL secret (and APP_BASE_URL_PREVIEW for preview)." >&2
+            echo "Missing APP_BASE_URL secret." >&2
             exit 1
           fi
           if ! printf '%s' "$TARGET_URL" | grep -Eq '^https?://'; then

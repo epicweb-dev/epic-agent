@@ -70,16 +70,21 @@ Configure these secrets for deploy workflows:
 
 - `CLOUDFLARE_API_TOKEN` (Workers deploy + D1 edit access on the correct
   account)
-- `CLOUDFLARE_ACCOUNT_ID` (recommended for reliable token-based Wrangler
-  commands in CI)
+- `CLOUDFLARE_ACCOUNT_ID` (required; used by CI to compute workers.dev preview
+  URLs and for reliable token-based Wrangler commands)
 - `COOKIE_SECRET` (same format as local)
 - `APP_BASE_URL` (production base URL)
-- `APP_BASE_URL_PREVIEW` (optional preview base URL; falls back to
-  `APP_BASE_URL` when omitted)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
 - `GITHUB_TOKEN` (optional, recommended for indexing throughput)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (required for protected manual reindex trigger)
+
+How to find `CLOUDFLARE_ACCOUNT_ID`:
+
+- Cloudflare dashboard: open any Workers page and copy the id from the URL
+  segment `accounts/<account-id>/...`.
+- Wrangler CLI (after `bunx wrangler login`): run `bunx wrangler whoami` and use
+  the printed `Account ID`.
 
 To load workshop content into D1 + Vectorize from CI, run the
 `🧠 Load Workshop Content` GitHub Actions workflow (`workflow_dispatch`):
@@ -112,9 +117,11 @@ To load workshop content into D1 + Vectorize from CI, run the
 - workflow summary output includes the returned reindex run ids for easier log
   correlation (`workshop_index_runs.id`)
 
-When PR preview deploys run, CI updates a pull request comment with the preview
-URL (when available from `APP_BASE_URL_PREVIEW`/`APP_BASE_URL`) and a link to
-the workflow run.
+When PR preview deploys run, CI deploys a unique Worker per PR named
+`epic-agent-pr-<number>`, updates a pull request comment with the computed
+workers.dev preview URL, and links to the workflow run.
+
+When the PR is closed, CI automatically deletes the corresponding preview Worker.
 
 If `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` are not configured, cloud
-deploy/migration steps are skipped in CI.
+deploy/migration steps and preview URL computation are skipped in CI.
