@@ -97,7 +97,8 @@ Indexing is manual-only and handled outside MCP tool calls via:
 - `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>`
 
 This route refreshes indexed workshop metadata, sections, and optional vector
-chunks used by retrieval tools.
+chunks used by retrieval tools. Optional `workshops` filters are trimmed and
+deduplicated server-side; empty lists fall back to full discovery-based reindex.
 
 Indexer GitHub API requests include bounded retry/backoff for transient failures
 (network fetch failures, 5xx/429, and secondary rate limits) before surfacing an

@@ -107,6 +107,76 @@ test('workshop index route returns reindex summary when authorized', async () =>
 	})
 })
 
+test('workshop index route normalizes duplicate workshop filters', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: [
+					' mcp-fundamentals ',
+					'advanced-typescript',
+					'mcp-fundamentals',
+				],
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 2,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toEqual(['mcp-fundamentals', 'advanced-typescript'])
+})
+
+test('workshop index route treats empty workshop filters as full reindex', async () => {
+	let capturedWorkshops: Array<string> | undefined
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				workshops: [],
+			}),
+		}),
+		createEnv(),
+		{
+			runWorkshopReindexFn: async ({ onlyWorkshops }) => {
+				capturedWorkshops = onlyWorkshops
+				return {
+					runId: 'run-123',
+					workshopCount: 2,
+					exerciseCount: 1,
+					stepCount: 1,
+					sectionCount: 1,
+					sectionChunkCount: 1,
+				}
+			},
+		},
+	)
+
+	expect(response.status).toBe(200)
+	expect(capturedWorkshops).toBeUndefined()
+})
+
 test('workshop index route returns 500 when reindex fails', async () => {
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {

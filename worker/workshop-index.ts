@@ -7,6 +7,14 @@ const reindexBodySchema = z.object({
 	workshops: z.array(z.string().trim().min(1)).optional(),
 })
 
+function normalizeWorkshops(workshops: Array<string> | undefined) {
+	if (!workshops || workshops.length === 0) return undefined
+	const normalized = Array.from(
+		new Set(workshops.map((workshop) => workshop.trim()).filter(Boolean)),
+	)
+	return normalized.length > 0 ? normalized : undefined
+}
+
 function unauthorizedResponse() {
 	return Response.json(
 		{
@@ -78,11 +86,12 @@ export async function handleWorkshopIndexRequest(
 
 	const runWorkshopReindexFn =
 		options.runWorkshopReindexFn ?? runWorkshopReindex
+	const normalizedWorkshops = normalizeWorkshops(parsedBody.data.workshops)
 
 	try {
 		const summary = await runWorkshopReindexFn({
 			env,
-			onlyWorkshops: parsedBody.data.workshops,
+			onlyWorkshops: normalizedWorkshops,
 		})
 		return Response.json({
 			ok: true,
