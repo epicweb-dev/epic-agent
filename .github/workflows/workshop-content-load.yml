@@ -94,8 +94,20 @@ jobs:
           RESPONSE_BODY=$(<"$RESPONSE_FILE")
           echo "Reindex response: $RESPONSE_BODY"
 
+          if ! printf '%s' "$RESPONSE_BODY" | jq -e . >/dev/null; then
+            echo "Workshop content load returned non-JSON response." >&2
+            exit 1
+          fi
+
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "Workshop content load failed with HTTP $HTTP_STATUS" >&2
+            exit 1
+          fi
+
+          RESPONSE_OK=$(printf '%s' "$RESPONSE_BODY" | jq -r '.ok // false')
+          if [ "$RESPONSE_OK" != "true" ]; then
+            ERROR_MESSAGE=$(printf '%s' "$RESPONSE_BODY" | jq -r '.error // "unknown error"')
+            echo "Workshop content load reported failure: $ERROR_MESSAGE" >&2
             exit 1
           fi
 
