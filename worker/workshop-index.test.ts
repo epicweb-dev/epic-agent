@@ -84,13 +84,11 @@ test('workshop index route rejects oversized workshop filters', async () => {
 
 	expect(response.status).toBe(400)
 	const payload = await response.json()
-	expect(payload).toMatchObject({
+	expect(payload).toEqual({
 		ok: false,
 		error: 'Invalid reindex payload.',
+		details: ['workshops must include at most 100 entries.'],
 	})
-	expect(payload.details).toEqual(
-		expect.arrayContaining([expect.stringContaining('<=100')]),
-	)
 })
 
 test('workshop index route returns reindex summary when authorized', async () => {
