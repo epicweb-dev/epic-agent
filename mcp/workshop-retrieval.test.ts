@@ -25,6 +25,7 @@ function createMockDb({
 			step_number?: number | null
 			section_kind?: string | null
 			label?: string | null
+			source_path?: string | null
 		}
 	>
 	workshops?: Array<string>
@@ -259,6 +260,7 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 				step_number: 1,
 				section_kind: 'problem-instructions',
 				label: 'Problem instructions',
+				source_path: 'exercises/01/README.mdx',
 			},
 			'run:workshop:20:0': {
 				chunk_content: 'Tool schemas and validation',
@@ -267,6 +269,7 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 				step_number: 1,
 				section_kind: 'solution-instructions',
 				label: 'Solution instructions',
+				source_path: 'exercises/02/README.mdx',
 			},
 		},
 		workshops: ['mcp-fundamentals'],
@@ -303,6 +306,7 @@ test('searchTopicContext returns ranked matches from vector ids', async () => {
 		stepNumber: 1,
 		sectionKind: 'problem-instructions',
 		sectionLabel: 'Problem instructions',
+		sourcePath: 'exercises/01/README.mdx',
 		chunk: 'MCP intro and architecture',
 		vectorId: 'run:workshop:10:0',
 	})

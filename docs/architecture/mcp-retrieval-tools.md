@@ -81,6 +81,7 @@ Behavior:
 - queries vector index with optional scope filters
 - resolves matched vector IDs back to chunk + section metadata in D1 using a
   batched lookup
+- includes `sourcePath` in ranked matches when section provenance is available
 - trims and dedupes matched vector IDs before returning ranked matches
 
 If bindings are missing, the tool returns an explicit unavailability error.

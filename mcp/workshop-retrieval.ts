@@ -430,6 +430,7 @@ type TopicChunkLookupRow = {
 	step_number?: number | null
 	section_kind?: string | null
 	label?: string | null
+	source_path?: string | null
 }
 
 async function loadTopicChunkRows({
@@ -453,7 +454,8 @@ async function loadTopicChunkRows({
 				c.exercise_number,
 				c.step_number,
 				s.section_kind,
-				s.label
+				s.label,
+				s.source_path
 			FROM indexed_section_chunks c
 			LEFT JOIN indexed_sections s
 				ON s.workshop_slug = c.workshop_slug
@@ -596,6 +598,7 @@ export async function searchTopicContext({
 		stepNumber?: number
 		sectionKind?: string
 		sectionLabel?: string
+		sourcePath?: string
 		chunk: string
 		vectorId: string
 	}> = []
@@ -615,6 +618,7 @@ export async function searchTopicContext({
 			stepNumber: row.step_number ?? undefined,
 			sectionKind: row.section_kind ?? undefined,
 			sectionLabel: row.label ?? undefined,
+			sourcePath: row.source_path ?? undefined,
 			chunk: row.chunk_content,
 			vectorId,
 		})
