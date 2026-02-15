@@ -85,8 +85,10 @@ To load workshop content into D1 + Vectorize from CI, run the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, reindex fails fast with an explicit
   error naming missing workshops
+- target URLs must be absolute `http://` or `https://` base URLs
 - the workflow retries transient network failures when calling the protected
   reindex endpoint
+- reindex HTTP calls use connect/request timeouts to avoid hanging CI jobs
 - the workflow expects a successful JSON response (`ok: true`) from the reindex
   endpoint and fails fast otherwise
 

@@ -44,9 +44,14 @@ jobs:
             TARGET_URL="$APP_BASE_URL"
           fi
 
+          TARGET_URL="$(printf '%s' "$TARGET_URL" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
           TARGET_URL="${TARGET_URL%/}"
           if [ -z "$TARGET_URL" ]; then
             echo "Missing APP_BASE_URL secret (and APP_BASE_URL_PREVIEW for preview)." >&2
+            exit 1
+          fi
+          if ! printf '%s' "$TARGET_URL" | grep -Eq '^https?://'; then
+            echo "Target URL must start with http:// or https://." >&2
             exit 1
           fi
 
@@ -90,6 +95,8 @@ jobs:
               --retry 3 \
               --retry-all-errors \
               --retry-delay 2 \
+              --connect-timeout 15 \
+              --max-time 300 \
               --output "$RESPONSE_FILE" \
               --write-out '%{http_code}' \
               --request POST \
