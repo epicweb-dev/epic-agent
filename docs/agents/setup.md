@@ -20,9 +20,13 @@ Quick notes for getting a local epic-agent environment running.
 - To trigger workshop indexing manually in local/dev environments:
   - set `WORKSHOP_INDEX_ADMIN_TOKEN` in `.env`
   - call `POST /internal/workshop-index/reindex` with
-    `Authorization: Bearer <token>`
+    `Authorization: Bearer <token>` (bearer scheme is case-insensitive)
   - optional `workshops` payload can be an array or comma/newline-delimited
     string; values are normalized to lowercase slugs
+  - optional batching fields:
+    - `batchSize` (1-20) to process workshops in smaller requests
+    - `cursor` for continuation, using the `nextCursor` returned by the prior
+      response
 - Add new mock API servers by following `docs/agents/mock-api-servers.md`.
 - If you only need the client bundle or worker, use:
   - `bun run dev:client`
