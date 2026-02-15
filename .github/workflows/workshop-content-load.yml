@@ -109,13 +109,19 @@ jobs:
             BATCH_SIZE_RAW="5"
           fi
 
-          BATCH_SIZE="$(jq -nr --arg value "$BATCH_SIZE_RAW" 'try ($value | tonumber) catch empty')"
-          if [ -z "$BATCH_SIZE" ] || ! printf '%s' "$BATCH_SIZE" | grep -Eq '^[0-9]+$'; then
-            echo "batchSize must be an integer between 1 and 20." >&2
+          # GitHub `workflow_dispatch` number inputs may arrive like "5.0".
+          BATCH_SIZE="$(
+            jq -nr --arg value "$BATCH_SIZE_RAW" '
+              try ($value | tonumber) catch empty
+              | if (.|floor) == . then (.|floor) else empty end
+            '
+          )"
+          if [ -z "$BATCH_SIZE" ]; then
+            echo "batchSize must be a whole number between 1 and 20 (received: $BATCH_SIZE_RAW)." >&2
             exit 1
           fi
           if [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 20 ]; then
-            echo "batchSize must be between 1 and 20." >&2
+            echo "batchSize must be between 1 and 20 (received: $BATCH_SIZE)." >&2
             exit 1
           fi
 
