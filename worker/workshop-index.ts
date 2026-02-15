@@ -13,7 +13,11 @@ const reindexBodySchema = z.object({
 function normalizeWorkshops(workshops: Array<string> | undefined) {
 	if (!workshops || workshops.length === 0) return undefined
 	const normalized = Array.from(
-		new Set(workshops.map((workshop) => workshop.trim()).filter(Boolean)),
+		new Set(
+			workshops
+				.map((workshop) => workshop.trim().toLowerCase())
+				.filter(Boolean),
+		),
 	)
 	return normalized.length > 0 ? normalized : undefined
 }

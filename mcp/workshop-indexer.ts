@@ -753,7 +753,9 @@ function filterRequestedRepositories({
 }) {
 	const normalizedSelections = Array.from(
 		new Set(
-			(onlyWorkshops ?? []).map((workshop) => workshop.trim()).filter(Boolean),
+			(onlyWorkshops ?? [])
+				.map((workshop) => workshop.trim().toLowerCase())
+				.filter(Boolean),
 		),
 	)
 	if (normalizedSelections.length === 0) {
@@ -761,7 +763,7 @@ function filterRequestedRepositories({
 	}
 
 	const availableRepositoryNames = new Set(
-		repositories.map((repository) => repository.name),
+		repositories.map((repository) => repository.name.toLowerCase()),
 	)
 	const missingSelections = normalizedSelections.filter(
 		(workshop) => !availableRepositoryNames.has(workshop),
@@ -774,7 +776,7 @@ function filterRequestedRepositories({
 
 	const selectedWorkshops = new Set(normalizedSelections)
 	return repositories.filter((repository) =>
-		selectedWorkshops.has(repository.name),
+		selectedWorkshops.has(repository.name.toLowerCase()),
 	)
 }
 

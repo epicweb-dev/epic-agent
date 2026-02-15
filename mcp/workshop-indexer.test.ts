@@ -105,7 +105,7 @@ test('filterRequestedRepositories returns all when filters are absent', () => {
 	expect(filtered).toEqual(repositories)
 })
 
-test('filterRequestedRepositories trims, dedupes, and filters selected workshops', () => {
+test('filterRequestedRepositories trims, lowercases, dedupes, and filters selected workshops', () => {
 	const repositories = [
 		{
 			owner: 'epicweb-dev',
@@ -126,8 +126,8 @@ test('filterRequestedRepositories trims, dedupes, and filters selected workshops
 	const filtered = workshopIndexerTestUtils.filterRequestedRepositories({
 		repositories,
 		onlyWorkshops: [
-			' mcp-fundamentals ',
-			'advanced-typescript',
+			' MCP-FUNDAMENTALS ',
+			'Advanced-TypeScript',
 			'mcp-fundamentals',
 		],
 	})
@@ -157,6 +157,22 @@ test('filterRequestedRepositories throws for unknown requested workshops', () =>
 		workshopIndexerTestUtils.filterRequestedRepositories({
 			repositories,
 			onlyWorkshops: ['mcp-fundamentals', 'missing-workshop'],
+		}),
+	).toThrow('Unknown workshop filter(s): missing-workshop.')
+})
+
+test('filterRequestedRepositories reports unknown workshops in normalized lowercase form', () => {
+	const repositories = [
+		{
+			owner: 'epicweb-dev',
+			name: 'mcp-fundamentals',
+			defaultBranch: 'main',
+		},
+	]
+	expect(() =>
+		workshopIndexerTestUtils.filterRequestedRepositories({
+			repositories,
+			onlyWorkshops: ['Missing-Workshop'],
 		}),
 	).toThrow('Unknown workshop filter(s): missing-workshop.')
 })

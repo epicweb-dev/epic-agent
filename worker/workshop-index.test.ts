@@ -134,7 +134,7 @@ test('workshop index route returns reindex summary when authorized', async () =>
 	})
 })
 
-test('workshop index route normalizes duplicate workshop filters', async () => {
+test('workshop index route normalizes and lowercases workshop filters', async () => {
 	let capturedWorkshops: Array<string> | undefined
 	const response = await handleWorkshopIndexRequest(
 		new Request(`https://example.com${workshopIndexRoutePath}`, {
@@ -145,8 +145,8 @@ test('workshop index route normalizes duplicate workshop filters', async () => {
 			},
 			body: JSON.stringify({
 				workshops: [
-					' mcp-fundamentals ',
-					'advanced-typescript',
+					' MCP-FUNDAMENTALS ',
+					'Advanced-TypeScript',
 					'mcp-fundamentals',
 				],
 			}),

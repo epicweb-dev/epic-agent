@@ -93,6 +93,8 @@ to populate D1 and Vectorize via the protected reindex endpoint.
 - choose the target environment (`production` or `preview`)
 - optionally provide comma/newline-separated workshop slugs to scope the index
   run
+- provided workshop slugs are trimmed, lowercased, and deduplicated before
+  reindex starts
 - leave workshop input empty to index all workshop repositories
 
 ## Agent/CI setup
