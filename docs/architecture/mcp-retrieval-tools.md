@@ -58,6 +58,7 @@ Supports:
 
 - optional case-insensitive `focus` filtering over diff section
   label/kind/source path/content
+- whitespace-only `focus` values are treated as omitted
 - same payload controls as learning context (`maxChars`, `cursor`)
 
 If a non-empty `focus` value yields no diff matches, the tool returns a

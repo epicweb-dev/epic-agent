@@ -678,3 +678,97 @@ test('retrieveDiffContext includes step scope when diff sections are missing', a
 		'No diff context found for workshop "mcp-fundamentals" exercise 1 step 1.',
 	)
 })
+
+test('retrieveDiffContext focus filter is case-insensitive across diff fields', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [1] },
+		workshopSteps: { 'mcp-fundamentals': ['1:1'] },
+		sectionRows: [
+			{
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'diff-summary',
+				label: 'API route diff',
+				content: 'Changed form action and request handlers.',
+				source_path: 'app/routes/login.tsx',
+				is_diff: 1,
+			},
+			{
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'diff-hunk',
+				label: 'Validation notes',
+				content: 'Added schema validation guard.',
+				source_path: 'app/lib/schema.ts',
+				is_diff: 1,
+			},
+		],
+	})
+	const env = { APP_DB: db } as unknown as Env
+
+	const sourcePathMatch = await retrieveDiffContext({
+		env,
+		workshop: 'mcp-fundamentals',
+		exerciseNumber: 1,
+		stepNumber: 1,
+		focus: 'SCHEMA.TS',
+	})
+	expect(sourcePathMatch.diffSections).toHaveLength(1)
+	expect(sourcePathMatch.diffSections[0]?.label).toBe('Validation notes')
+
+	const contentMatch = await retrieveDiffContext({
+		env,
+		workshop: 'mcp-fundamentals',
+		exerciseNumber: 1,
+		stepNumber: 1,
+		focus: 'FORM ACTION',
+	})
+	expect(contentMatch.diffSections).toHaveLength(1)
+	expect(contentMatch.diffSections[0]?.label).toBe('API route diff')
+})
+
+test('retrieveDiffContext ignores whitespace-only focus filters', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		workshops: ['mcp-fundamentals'],
+		workshopExercises: { 'mcp-fundamentals': [1] },
+		workshopSteps: { 'mcp-fundamentals': ['1:1'] },
+		sectionRows: [
+			{
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'diff-summary',
+				label: 'API route diff',
+				content: 'Changed form action and request handlers.',
+				source_path: 'app/routes/login.tsx',
+				is_diff: 1,
+			},
+			{
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'diff-hunk',
+				label: 'Validation notes',
+				content: 'Added schema validation guard.',
+				source_path: 'app/lib/schema.ts',
+				is_diff: 1,
+			},
+		],
+	})
+	const env = { APP_DB: db } as unknown as Env
+
+	const result = await retrieveDiffContext({
+		env,
+		workshop: 'mcp-fundamentals',
+		exerciseNumber: 1,
+		stepNumber: 1,
+		focus: '   ',
+	})
+
+	expect(result.diffSections).toHaveLength(2)
+})
