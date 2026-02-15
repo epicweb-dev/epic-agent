@@ -30,7 +30,8 @@ App access pattern:
   statements (unsupported in Workers SQLite runtime) and relies on D1 prepared
   statement writes instead
 - if a write fails mid-replacement, reindex performs a best-effort
-  workshop-scope cleanup pass to avoid leaving partial indexed rows
+  workshop-scope cleanup pass to avoid leaving partial indexed rows, logs
+  cleanup failures, and preserves the original write error
 
 ## KV (`OAUTH_KV`)
 

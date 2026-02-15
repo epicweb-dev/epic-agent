@@ -287,3 +287,62 @@ test('replaceWorkshopIndex clears workshop scope after partial write failures', 
 		executedSql.filter((sql) => sql.includes('DELETE FROM indexed_workshops')),
 	).toHaveLength(2)
 })
+
+test('replaceWorkshopIndex preserves original write error when cleanup also fails', async () => {
+	let deleteStatementCount = 0
+	const db = {
+		prepare(sql: string) {
+			return {
+				bind(..._params: Array<unknown>) {
+					return {
+						async run() {
+							if (sql.includes('DELETE FROM indexed_')) {
+								deleteStatementCount += 1
+								if (deleteStatementCount > 5) {
+									throw new Error('cleanup failed')
+								}
+								return {}
+							}
+							if (sql.includes('INSERT INTO indexed_steps')) {
+								throw new Error('step insert failed')
+							}
+							return {}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+
+	const capturedWarnings: Array<string> = []
+	const originalWarn = console.warn
+	console.warn = (...args: Array<unknown>) => {
+		capturedWarnings.push(args.map((item) => String(item)).join(' '))
+	}
+
+	try {
+		const fixture = createReplaceWorkshopIndexFixture()
+		await expect(
+			replaceWorkshopIndex({
+				db,
+				...fixture,
+			}),
+		).rejects.toThrow('step insert failed')
+	} finally {
+		console.warn = originalWarn
+	}
+
+	expect(deleteStatementCount).toBe(6)
+	expect(
+		capturedWarnings.some((warning) =>
+			warning.includes('workshop-index-write-cleanup-failed'),
+		),
+	).toBe(true)
+	expect(
+		capturedWarnings.some(
+			(warning) =>
+				warning.includes('"originalError":"step insert failed"') &&
+				warning.includes('"cleanupError":"cleanup failed"'),
+		),
+	).toBe(true)
+})

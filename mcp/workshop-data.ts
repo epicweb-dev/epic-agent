@@ -544,10 +544,27 @@ export async function replaceWorkshopIndex({
 				.run()
 		}
 	} catch (error) {
-		await clearWorkshopIndexScope({
-			db,
-			workshopSlug: workshop.workshopSlug,
-		})
+		const originalMessage =
+			error instanceof Error ? error.message : String(error)
+		try {
+			await clearWorkshopIndexScope({
+				db,
+				workshopSlug: workshop.workshopSlug,
+			})
+		} catch (cleanupError) {
+			const cleanupMessage =
+				cleanupError instanceof Error
+					? cleanupError.message
+					: String(cleanupError)
+			console.warn(
+				'workshop-index-write-cleanup-failed',
+				JSON.stringify({
+					workshopSlug: workshop.workshopSlug,
+					originalError: originalMessage,
+					cleanupError: cleanupMessage,
+				}),
+			)
+		}
 		throw error
 	}
 }
