@@ -1,398 +1,96 @@
-name: 🚀 Deploy
+name: 🚀 Deploy (production)
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, closed]
-
-concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_run:
+    workflows:
+      - '✅ Validate'
+    types:
+      - completed
 
 permissions:
   contents: read
-  pull-requests: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    name: 🧹 Lint
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🧹 Lint
-        run: bun run lint
-
-  typecheck:
-    runs-on: ubuntu-latest
-    name: 🧪 Typecheck
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🧪 Typecheck
-        run: bun run typecheck
-
-  test:
-    runs-on: ubuntu-latest
-    name: ✅ Bun Tests
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: ✅ Run Bun Tests
-        run: bun test server
-
-  e2e:
-    runs-on: ubuntu-latest
-    name: 🎭 E2E
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 🎭 Cache Playwright Browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🎭 Install Playwright Browsers
-        run: bun run test:e2e:install
-
-      - name: 🗄️ Apply D1 Migrations
-        run: bun run migrate:local
-
-      - name: 🧪 Playwright Tests
-        run: bun run test:e2e
-
-  mcp-e2e:
-    runs-on: ubuntu-latest
-    name: 🧩 MCP E2E
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🗄️ Apply D1 Migrations
-        run: bun run migrate:local
-
-      - name: 🧩 MCP E2E Tests
-        run: bun run test:mcp
-
   deploy:
     runs-on: ubuntu-latest
-    name: 🚀 Deploy
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    needs:
-      - lint
-      - typecheck
-      - test
-      - e2e
-      - mcp-e2e
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
-      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
+    name: 🚀 Deploy to production
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
     steps:
       - name: 📦 Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: 🧾 Ensure validated SHA is main HEAD
+        id: sha_guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          HEAD_SHA="$(git rev-parse origin/main)"
+          if [ "$HEAD_SHA" != "${{ github.event.workflow_run.head_sha }}" ]; then
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping deploy: validated SHA is not current main HEAD."
+            echo "validated=${{ github.event.workflow_run.head_sha }}"
+            echo "head=$HEAD_SHA"
+            exit 0
+          fi
+          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
 
       - name: 🧰 Setup Bun
+        if: steps.sha_guard.outputs.should_deploy == 'true'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: 📥 Install Dependencies
+        if: steps.sha_guard.outputs.should_deploy == 'true'
         run: bun install --frozen-lockfile
 
-      - name: 🔐 Sync Cloudflare Secrets
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --env production
-          echo "$APP_BASE_URL" | bunx wrangler secret put APP_BASE_URL --env production
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --env production
-          fi
-          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --env production
-          fi
-
-      - name: 🔐 Sync Cloudflare Secrets (Stable Preview)
-        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
-        run: |
-          PREVIEW_WORKER_NAME="epic-agent-preview"
-          if [ -n "$COOKIE_SECRET" ]; then
-            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --name "$PREVIEW_WORKER_NAME"
-          fi
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --name "$PREVIEW_WORKER_NAME"
-          fi
-          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --name "$PREVIEW_WORKER_NAME"
-          fi
-
-      - name: 🔐 Sync Cloudflare Secrets (Preview)
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.fork == false &&
-          env.CLOUDFLARE_API_TOKEN != ''
-        run: |
-          PREVIEW_WORKER_NAME="epic-agent-pr-${{ github.event.pull_request.number }}"
-          if [ -n "$COOKIE_SECRET" ]; then
-            echo "$COOKIE_SECRET" | bunx wrangler secret put COOKIE_SECRET --name "$PREVIEW_WORKER_NAME"
-          fi
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "$GITHUB_TOKEN" | bunx wrangler secret put GITHUB_TOKEN --name "$PREVIEW_WORKER_NAME"
-          fi
-          if [ -n "$WORKSHOP_INDEX_ADMIN_TOKEN" ]; then
-            echo "$WORKSHOP_INDEX_ADMIN_TOKEN" | bunx wrangler secret put WORKSHOP_INDEX_ADMIN_TOKEN --name "$PREVIEW_WORKER_NAME"
-          fi
+      - name: 🔐 Sync Cloudflare Secrets (bulk)
+        if: steps.sha_guard.outputs.should_deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          RESEND_API_BASE_URL: ${{ secrets.RESEND_API_BASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
+          WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS:
+            ${{ secrets.WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS }}
+          WORKSHOP_CONTEXT_HARD_MAX_CHARS:
+            ${{ secrets.WORKSHOP_CONTEXT_HARD_MAX_CHARS }}
+        run: >
+          bun tools/ci/sync-worker-secrets.ts --env production --set-from-env
+          COOKIE_SECRET --set-from-env-optional APP_BASE_URL
+          --set-from-env-optional RESEND_API_BASE_URL --set-from-env-optional
+          RESEND_API_KEY --set-from-env-optional RESEND_FROM_EMAIL
+          --set-from-env-optional GITHUB_TOKEN --set-from-env-optional
+          WORKSHOP_INDEX_ADMIN_TOKEN --set-from-env-optional
+          WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional
+          WORKSHOP_CONTEXT_HARD_MAX_CHARS
 
       - name: 🗄️ Apply D1 Migrations
-        if: github.ref == 'refs/heads/main'
-        run: bun ./wrangler-env.ts d1 migrations apply epic-agent --remote
-
-      - name: 🗄️ Apply D1 Migrations (Preview)
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.fork == false &&
-          env.CLOUDFLARE_API_TOKEN != ''
-        run: >-
-          bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
-          preview
-
-      - name: 🗄️ Apply D1 Migrations (Stable Preview)
-        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
-        run: >-
-          bun ./wrangler-env.ts d1 migrations apply APP_DB --remote --env
-          preview
-
-      - name: 🏗️ Build
-        run: bun run build
+        if: steps.sha_guard.outputs.should_deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bun ./wrangler-env.ts d1 migrations apply APP_DB --remote
 
       - name: ☁️ Deploy to Cloudflare Workers
-        if: github.ref == 'refs/heads/main'
-        run: bun ./wrangler-env.ts deploy
-
-      - name: ☁️ Deploy Preview to Cloudflare Workers
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.fork == false &&
-          env.CLOUDFLARE_API_TOKEN != ''
+        if: steps.sha_guard.outputs.should_deploy == 'true'
         env:
-          CLOUDFLARE_ENV: preview
-          PREVIEW_WORKER_NAME: >-
-            epic-agent-pr-${{ github.event.pull_request.number }}
-        run: bun ./wrangler-env.ts deploy --name "$PREVIEW_WORKER_NAME"
-
-      - name: ☁️ Deploy Stable Preview to Cloudflare Workers
-        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
-        env:
-          CLOUDFLARE_ENV: preview
-        run: bun ./wrangler-env.ts deploy --name epic-agent-preview
-
-      - name: 💬 Comment Preview Deployment
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.fork == false &&
-          env.CLOUDFLARE_API_TOKEN != ''
-        uses: actions/github-script@v7
-        env:
-          PREVIEW_WORKER_NAME: >-
-            epic-agent-pr-${{ github.event.pull_request.number }}
-        with:
-          script: |
-            const marker = '<!-- preview-deploy-comment -->'
-            const previewWorkerName = process.env.PREVIEW_WORKER_NAME || ''
-            const token = process.env.CLOUDFLARE_API_TOKEN || ''
-            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
-
-            let previewUrl = ''
-            if (token && accountId && previewWorkerName) {
-              const response = await fetch(
-                `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                },
-              )
-              const data = await response.json()
-              const subdomain = data?.result?.subdomain
-              if (response.ok && typeof subdomain === 'string' && subdomain.length > 0) {
-                previewUrl = `https://${previewWorkerName}.${subdomain}.workers.dev`
-              }
-            }
-            const lines = [
-              marker,
-              '## 🚀 Preview deployment updated',
-              '',
-              previewUrl ? `Preview URL: ${previewUrl}` : `Preview Worker: \`${previewWorkerName}\``,
-              '',
-              `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ]
-            const body = lines.join('\n')
-
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            })
-            const existing = comments.find((comment) => comment.body?.includes(marker))
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              })
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              })
-            }
-
-  cleanup-preview:
-    runs-on: ubuntu-latest
-    name: 🧽 Cleanup Preview
-    if: >-
-      github.event_name == 'pull_request' && github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.fork == false
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PREVIEW_WORKER_NAME: epic-agent-pr-${{ github.event.pull_request.number }}
-    steps:
-      - name: 📦 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 📥 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🗑️ Delete PR Preview Worker
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        continue-on-error: true
-        env:
-          CLOUDFLARE_ENV: preview
-        run: bunx wrangler delete "$PREVIEW_WORKER_NAME" --env preview --force
-
-      - name: 💬 Comment Preview Cleanup
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const marker = '<!-- preview-deploy-comment -->'
-            const previewWorkerName = process.env.PREVIEW_WORKER_NAME || ''
-            const token = process.env.CLOUDFLARE_API_TOKEN || ''
-            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
-
-            let previewUrl = ''
-            if (token && accountId && previewWorkerName) {
-              const response = await fetch(
-                `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                },
-              )
-              const data = await response.json()
-              const subdomain = data?.result?.subdomain
-              if (response.ok && typeof subdomain === 'string' && subdomain.length > 0) {
-                previewUrl = `https://${previewWorkerName}.${subdomain}.workers.dev`
-              }
-            }
-
-            const lines = [
-              marker,
-              '## 🧽 Preview deployment cleaned up',
-              '',
-              previewUrl ? `Preview URL removed: ${previewUrl}` : `Preview Worker removed: \`${previewWorkerName}\``,
-            ]
-            const body = lines.join('\n')
-
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            })
-            const existing = comments.find((comment) => comment.body?.includes(marker))
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              })
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              })
-            }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bun run deploy

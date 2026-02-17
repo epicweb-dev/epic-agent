@@ -4,6 +4,10 @@ Mock servers emulate third-party APIs during local development. They are started
 by `bun run dev` in `cli.ts`, and each third party gets its own mock server
 file.
 
+For GitHub Actions preview deployments, deployable mock Workers live under
+`mock-servers/` (currently `mock-servers/resend`). Local development mocks still
+live under `tools/`.
+
 ### Add a new third-party mock
 
 1. Create a new mock server file under `tools/`, for example
