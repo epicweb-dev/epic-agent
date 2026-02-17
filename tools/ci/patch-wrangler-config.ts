@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { stripJsonc } from '../strip-jsonc.ts'
 
 type CliOptions = {
 	input?: string
@@ -77,15 +78,6 @@ function parseArgs(argv: Array<string>): CliOptions {
 		}
 	}
 	return options
-}
-
-function stripJsonc(content: string) {
-	// Keep parsing lightweight (CI-safe), but handle the JSONC patterns we use:
-	// comments + trailing commas.
-	return content
-		.replace(/\/\*[\s\S]*?\*\//g, '')
-		.replace(/^\s*\/\/.*$/gm, '')
-		.replace(/,\s*([}\]])/g, '$1')
 }
 
 function assertString(value: unknown, label: string) {

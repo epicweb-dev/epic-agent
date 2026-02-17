@@ -1,5 +1,6 @@
 import { readFileSync, appendFileSync } from 'node:fs'
 import { z } from 'zod'
+import { stripJsonc } from './strip-jsonc.ts'
 import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
 import {
 	workshopFilterMaxCount,
@@ -50,13 +51,6 @@ type RemoteD1Result<T> = Omit<D1Result<T>, 'success'> & {
 type VectorizeIndexResolution =
 	| { enabled: false }
 	| { enabled: true; indexName: string; source: 'wrangler' | 'env' | 'default' }
-
-function stripJsonc(value: string) {
-	return value
-		.replace(/\/\*[\s\S]*?\*\//g, '')
-		.replace(/^\s*\/\/.*$/gm, '')
-		.replace(/,\s*([}\]])/g, '$1')
-}
 
 function loadWranglerConfig(): WranglerConfig {
 	const raw = readFileSync('wrangler.jsonc', 'utf8')
