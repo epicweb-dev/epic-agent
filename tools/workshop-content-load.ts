@@ -359,12 +359,30 @@ class RemoteD1Database {
 		})
 
 		const path = `/accounts/${this.#accountId}/d1/database/${this.#databaseId}/query`
-		const result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
-			apiToken: this.#apiToken,
-			path,
-			method: 'POST',
-			body: queries,
-		})
+		// Cloudflare's D1 REST API now expects an object payload for batched queries.
+		// Older versions accepted a top-level array, so we keep a compatibility
+		// fallback for environments that haven't rolled forward yet.
+		let result: Array<RemoteD1Result<T>>
+		try {
+			result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
+				apiToken: this.#apiToken,
+				path,
+				method: 'POST',
+				body: { statements: queries },
+			})
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			if (message.includes('Expected array, received object')) {
+				result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
+					apiToken: this.#apiToken,
+					path,
+					method: 'POST',
+					body: queries,
+				})
+			} else {
+				throw error
+			}
+		}
 		for (const [index, entry] of result.entries()) {
 			if (entry?.success === true) continue
 			const errorDetails = entry ? formatD1ResultError(entry) : ''
@@ -744,6 +762,7 @@ async function main() {
 
 	const onlyWorkshops = parseWorkshopsInput(process.env.WORKSHOP_LIST_INPUT)
 	const wranglerConfig = loadWranglerConfig()
+
 	const d1DatabaseId = resolveD1DatabaseId({
 		config: wranglerConfig,
 		environment: parsedEnv.TARGET_ENVIRONMENT,
@@ -771,6 +790,13 @@ async function main() {
 			})
 		: { enabled: false as const, indexName: undefined, created: false }
 	const vectorizeEnabled = vectorizeIndexName.enabled && vectorizeSetup.enabled
+
+	const vectorizeLabel = vectorizeEnabled
+		? `enabled (${vectorizeSetup.indexName})${vectorizeSetup.created ? ' (created)' : ''}`
+		: vectorizeIndexName.enabled
+			? `disabled (${vectorizeIndexName.indexName})`
+			: 'disabled'
+
 	const env: Env = {
 		APP_DB: db,
 		...(process.env.GITHUB_TOKEN
@@ -833,11 +859,6 @@ async function main() {
 	const workshopsLabel = onlyWorkshops?.length
 		? onlyWorkshops.join(', ')
 		: 'all discovered workshop repositories'
-	const vectorizeLabel = vectorizeEnabled
-		? `enabled (${vectorizeSetup.indexName})${vectorizeSetup.created ? ' (created)' : ''}`
-		: vectorizeIndexName.enabled
-			? `disabled (${vectorizeIndexName.indexName})`
-			: 'disabled'
 
 	appendStepSummary(
 		[

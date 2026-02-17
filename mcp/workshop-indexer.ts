@@ -68,7 +68,8 @@ const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
 const defaultVectorUpsertBatchSize = 200
-const vectorDeleteBatchSize = 500
+// Vectorize delete_by_ids currently caps payloads at 100 ids.
+const vectorDeleteBatchSize = 100
 const githubRequestMaxAttempts = 3
 const githubRetryBaseDelayMs = 500
 const githubRetryMaxDelayMs = 30_000
