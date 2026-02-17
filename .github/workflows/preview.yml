@@ -235,7 +235,7 @@ jobs:
             mock_worker_name="${APP_WORKER_NAME}-mock-${service}"
             deploy_log="deploy-mock-${service}.log"
 
-            mock_config="wrangler-preview-mock-${service}.json"
+            mock_config="${dir}/wrangler-preview-generated.json"
             bun tools/ci/patch-wrangler-config.ts \
               --input "$dir/wrangler.jsonc" \
               --output "$mock_config" \
@@ -244,7 +244,7 @@ jobs:
               --d1-database-name "$DB_NAME" \
               --d1-database-id "$DB_ID"
 
-            bun tools/ci/sync-worker-secrets.ts --name "$mock_worker_name" --config "$mock_config" --set "MOCK_API_TOKEN=$MOCK_API_TOKEN"
+            bun tools/ci/sync-worker-secrets.ts --env preview --name "$mock_worker_name" --config "$mock_config" --set "MOCK_API_TOKEN=$MOCK_API_TOKEN"
 
             bunx wrangler deploy --env preview --name "$mock_worker_name" --config "$mock_config" 2>&1 | tee "$deploy_log"
 
@@ -295,7 +295,7 @@ jobs:
             exit 1
           fi
 
-          bun tools/ci/sync-worker-secrets.ts --name "$APP_WORKER_NAME" --from-dotenv "$ENV_FILE" --from-dotenv "$OVERRIDES_FILE" --generate-cookie-secret --include-empty --set-from-env-optional GITHUB_TOKEN --set-from-env-optional WORKSHOP_INDEX_ADMIN_TOKEN --set-from-env-optional WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional WORKSHOP_CONTEXT_HARD_MAX_CHARS
+          bun tools/ci/sync-worker-secrets.ts --env preview --name "$APP_WORKER_NAME" --from-dotenv "$ENV_FILE" --from-dotenv "$OVERRIDES_FILE" --generate-cookie-secret --include-empty --set-from-env-optional GITHUB_TOKEN --set-from-env-optional WORKSHOP_INDEX_ADMIN_TOKEN --set-from-env-optional WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional WORKSHOP_CONTEXT_HARD_MAX_CHARS
 
       - name: ☁️ Deploy preview app Worker
         id: deploy_preview

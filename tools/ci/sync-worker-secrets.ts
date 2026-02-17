@@ -221,7 +221,7 @@ async function runWranglerSecretBulk(options: CliOptions, dotenvText: string) {
 		mode: 0o600,
 	})
 	args.push(secretsFilePath)
-	if (options.env !== undefined && options.env.length > 0) {
+	if (options.env !== undefined) {
 		args.push('--env', options.env)
 	}
 	if (options.name) {
