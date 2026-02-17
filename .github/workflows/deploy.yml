@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: deploy-production
@@ -18,6 +19,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: 🚀 Deploy to production
+    environment:
+      name: production
+      url: ${{ secrets.APP_BASE_URL }}
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&

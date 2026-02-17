@@ -58,6 +58,14 @@ When running Wrangler remote commands with `CLOUDFLARE_API_TOKEN`, also set
 `CLOUDFLARE_ACCOUNT_ID` explicitly. CI also uses it to compute workers.dev
 preview URLs.
 
+## CI preview deploy resources
+
+- PR preview deployments provision isolated Cloudflare resources per preview:
+  - a dedicated D1 database
+  - a dedicated KV namespace for `OAUTH_KV`
+- The preview cleanup workflow deletes the preview Workers and these resources
+  when the PR closes.
+
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 
 - Cloudflare dashboard: open any Workers page and copy the id from the URL
