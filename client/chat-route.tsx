@@ -172,9 +172,6 @@ function ChatPage(handle: Handle) {
 
 		inputValue = ''
 		pushMessage(createMessage({ role: 'user', content: text }))
-		status = 'sending'
-		handle.update()
-		queueScrollToBottom()
 
 		await sendTurn(text)
 	}

@@ -15,6 +15,8 @@ import { mcpResourcePath } from './mcp-auth.ts'
 
 export const chatTurnPath = '/chat/turn'
 
+const mcpOperationTimeoutMs = 10_000
+
 const chatTurnRequestSchema = z.object({
 	message: z.string().trim().min(1).max(10_000),
 	mcpSessionId: z.string().trim().min(1).nullable().optional(),
@@ -81,10 +83,11 @@ function planTurn(message: string): ToolCallPlan {
 				toolArguments: parsed as Record<string, unknown>,
 			}
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
+			const errorMessage =
+				error instanceof Error ? error.message : String(error)
 			return {
 				kind: 'help',
-				content: `Invalid JSON args for /tool: ${message}\n\n${buildHelpMessage()}`,
+				content: `Invalid JSON args for /tool: ${errorMessage}\n\n${buildHelpMessage()}`,
 			}
 		}
 	}
@@ -136,6 +139,52 @@ function planTurn(message: string): ToolCallPlan {
 	return { kind: 'help', content: buildHelpMessage() }
 }
 
+type ExecutionContextWithProps<TProps> = ExecutionContext & { props?: TProps }
+type McpContextProps = { baseUrl: string }
+
+function injectBaseUrlIntoExecutionContext(
+	ctx: ExecutionContext,
+	baseUrl: string,
+): ExecutionContextWithProps<McpContextProps> {
+	// MCP agent instances depend on ctx.props.baseUrl (normally set by `worker/mcp-auth.ts`
+	// for external `/mcp` requests). Chat turns call MCP internally, so we replicate the
+	// same contract here.
+	const context = ctx as ExecutionContextWithProps<unknown>
+	const existingProps =
+		context.props && typeof context.props === 'object'
+			? (context.props as Record<string, unknown>)
+			: {}
+
+	context.props = { ...existingProps, baseUrl }
+	return ctx as ExecutionContextWithProps<McpContextProps>
+}
+
+async function raceWithTimeout<T>({
+	action,
+	timeoutMs,
+	onTimeout,
+	timeoutMessage,
+}: {
+	action: Promise<T>
+	timeoutMs: number
+	onTimeout: () => void | Promise<void>
+	timeoutMessage: string
+}): Promise<T> {
+	let timeoutId: ReturnType<typeof setTimeout> | null = null
+	const timeoutPromise = new Promise<never>((_resolve, reject) => {
+		timeoutId = setTimeout(() => {
+			void onTimeout()
+			reject(new Error(timeoutMessage))
+		}, timeoutMs)
+	})
+
+	try {
+		return await Promise.race([action, timeoutPromise])
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId)
+	}
+}
+
 async function withMcpClient({
 	request,
 	env,
@@ -153,10 +202,7 @@ async function withMcpClient({
 		binding: 'MCP_OBJECT',
 	}).fetch
 
-	const mcpCtx = ctx as ExecutionContext<{ baseUrl: string }>
-	;(mcpCtx as unknown as { props?: { baseUrl: string } }).props = {
-		baseUrl: origin,
-	}
+	const mcpCtx = injectBaseUrlIntoExecutionContext(ctx, origin)
 
 	const transport = new StreamableHTTPClientTransport(serverUrl, {
 		sessionId: mcpSessionId,
@@ -240,7 +286,12 @@ export async function handleChatTurnRequest({
 
 		try {
 			if (plan.kind === 'list-tools') {
-				const result = await mcp.client.listTools()
+				const result = await raceWithTimeout({
+					action: mcp.client.listTools(),
+					timeoutMs: mcpOperationTimeoutMs,
+					onTimeout: mcp.close,
+					timeoutMessage: `Timed out listing MCP tools after ${mcpOperationTimeoutMs}ms.`,
+				})
 				const lines = [
 					'Available MCP tools:',
 					...result.tools.map((tool) => {
@@ -257,9 +308,14 @@ export async function handleChatTurnRequest({
 				})
 			}
 
-			const result = (await mcp.client.callTool({
-				name: plan.toolName,
-				arguments: plan.toolArguments,
+			const result = (await raceWithTimeout({
+				action: mcp.client.callTool({
+					name: plan.toolName,
+					arguments: plan.toolArguments,
+				}),
+				timeoutMs: mcpOperationTimeoutMs,
+				onTimeout: mcp.close,
+				timeoutMessage: `Timed out calling MCP tool "${plan.toolName}" after ${mcpOperationTimeoutMs}ms.`,
 			})) as CallToolResult
 
 			const text = getTextResultContent(result)
@@ -285,10 +341,11 @@ export async function handleChatTurnRequest({
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
+		console.error('chat-turn-mcp-failed', message, error)
 		return jsonResponse(
 			{
 				ok: false,
-				error: `Unable to run MCP turn: ${message}`,
+				error: 'Unable to run MCP turn.',
 			},
 			{ status: 500 },
 		)

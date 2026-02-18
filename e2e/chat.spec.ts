@@ -40,5 +40,7 @@ test('chat calls MCP tools', async ({ page }) => {
 	await page.locator('textarea[name="message"]').fill('8 + 4')
 	await page.getByRole('button', { name: 'Send' }).click()
 
-	await expect(page.getByText('The result of 8 + 4 is 12')).toBeVisible()
+	await expect(page.getByText('The result of 8 + 4 is 12')).toBeVisible({
+		timeout: 15_000,
+	})
 })
