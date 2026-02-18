@@ -459,17 +459,47 @@ function ChatPage(handle: Handle) {
 						flushActiveStreamToMessages(activeStream)
 					}
 				} catch {
-					// Ignore malformed stream chunks.
+					// Some server-side failures send plain text (not JSON chunk frames).
+					// Treat it as assistant text so the user sees a useful error message.
+					let lastText: Record<string, unknown> | undefined
+					for (let i = activeStream.parts.length - 1; i >= 0; i -= 1) {
+						if (activeStream.parts[i]?.type === 'text') {
+							lastText = activeStream.parts[i]
+							break
+						}
+					}
+
+					if (lastText && typeof lastText.text === 'string') {
+						lastText.text += body
+					} else {
+						activeStream.parts.push({
+							type: 'text',
+							text: body,
+							state: 'streaming',
+						})
+					}
+
+					if (data.replay !== true) {
+						flushActiveStreamToMessages(activeStream)
+					}
 				}
 			}
 
-			if (data.done === true || data.error === true) {
+			const isError = data.error === true
+			if (data.done === true || isError) {
 				if (data.replay === true && activeStream) {
 					flushActiveStreamToMessages(activeStream)
 				}
 				activeStream = null
 				currentRequestId = null
-				setStatus('ready')
+				if (isError) {
+					setStatus(
+						'error',
+						body.trim().length > 0 ? body.trim() : 'Chat request failed.',
+					)
+				} else {
+					setStatus('ready')
+				}
 			} else {
 				setStatus('streaming')
 			}

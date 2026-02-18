@@ -154,18 +154,35 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 			}),
 		}
 
-		const result = streamText({
-			// workers-ai-provider currently types only a subset of Workers AI models.
-			// Prefer a typed model name to keep `bun run typecheck` green.
-			model: workersai('@cf/meta/llama-3.1-8b-instruct-awq'),
-			system: buildSystemPrompt(),
-			messages: pruneMessages({
-				messages: await convertToModelMessages(this.messages),
-				toolCalls: 'before-last-2-messages',
-			}),
-			tools,
-			stopWhen: stepCountIs(6),
-		})
+		let result: ReturnType<typeof streamText>
+		try {
+			result = streamText({
+				// workers-ai-provider currently types only a subset of Workers AI models.
+				// Prefer a typed model name to keep `bun run typecheck` green.
+				model: workersai('@cf/meta/llama-3.1-8b-instruct-awq'),
+				system: buildSystemPrompt(),
+				messages: pruneMessages({
+					messages: await convertToModelMessages(this.messages),
+					toolCalls: 'before-last-2-messages',
+				}),
+				tools,
+				stopWhen: stepCountIs(6),
+			})
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			return new Response(
+				[
+					'Unable to run Workers AI for chat in this environment.',
+					'Local Wrangler mode does not support Workers AI; deploy/preview or run Wrangler in remote mode to test real model output.',
+					'',
+					`Error: ${message}`,
+				].join('\n'),
+				{
+					status: 503,
+					headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+				},
+			)
+		}
 
 		return result.toUIMessageStreamResponse()
 	}
