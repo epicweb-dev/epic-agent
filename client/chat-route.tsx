@@ -42,9 +42,6 @@ type ChatTurnError = {
 }
 
 function safeRandomId() {
-	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-		return crypto.randomUUID()
-	}
 	return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
@@ -333,7 +330,7 @@ function ChatPage(handle: Handle) {
 							aria-label="Message"
 							value={inputValue}
 							rows={3}
-							placeholder="Type a message…"
+							placeholder="Type a message..."
 							disabled={isSending}
 							on={{ input: handleInput, keydown: handleKeyDown }}
 							css={{
@@ -375,7 +372,7 @@ function ChatPage(handle: Handle) {
 									: undefined,
 							}}
 						>
-							{isSending ? 'Sending…' : 'Send'}
+							{isSending ? 'Sending...' : 'Send'}
 						</button>
 						<p
 							css={{
