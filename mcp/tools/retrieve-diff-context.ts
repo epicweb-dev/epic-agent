@@ -1,19 +1,17 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
 import {
+	buildErrorResult,
+	buildInputValidationErrorResult,
+	formatBullets,
 	readOnlyToolAnnotations,
+	formatDiffSectionsMarkdown,
+	formatOptionalCursor,
+	formatOptionalStep,
 	retrievalSectionOutputSchema,
 } from '../mcp-utils.ts'
 import { retrieveDiffContextInputSchema } from '../workshop-contracts.ts'
 import { retrieveDiffContext } from '../workshop-retrieval.ts'
-import {
-	buildErrorResult,
-	buildInputValidationErrorResult,
-	formatBullets,
-	formatDiffSectionsMarkdown,
-	formatOptionalCursor,
-	formatOptionalStep,
-} from '../mcp-utils.ts'
 
 const name = 'retrieve_diff_context' as const
 

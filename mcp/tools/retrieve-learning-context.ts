@@ -1,19 +1,17 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
 import {
+	buildErrorResult,
+	buildInputValidationErrorResult,
+	formatBullets,
 	nonDeterministicReadOnlyToolAnnotations,
+	formatOptionalCursor,
+	formatOptionalStep,
+	formatSectionsMarkdown,
 	retrievalSectionOutputSchema,
 } from '../mcp-utils.ts'
 import { retrieveLearningContextInputSchema } from '../workshop-contracts.ts'
 import { retrieveLearningContext } from '../workshop-retrieval.ts'
-import {
-	buildErrorResult,
-	buildInputValidationErrorResult,
-	formatBullets,
-	formatOptionalCursor,
-	formatOptionalStep,
-	formatSectionsMarkdown,
-} from '../mcp-utils.ts'
 
 const name = 'retrieve_learning_context' as const
 
