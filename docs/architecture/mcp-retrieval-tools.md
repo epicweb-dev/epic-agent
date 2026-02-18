@@ -14,6 +14,16 @@ The MCP server currently exposes these retrieval-oriented tools:
 - `retrieve_quiz_instructions` (quiz facilitation protocol / retention
   checklist)
 
+## Response format
+
+All tools return:
+
+- `content`: human-readable Markdown intended for direct use by an agent
+- `structuredContent`: the full structured payload for programmatic consumption
+
+Clients should prefer `structuredContent` for parsing and use `content` for
+display/UX.
+
 ## `list_workshops`
 
 Returns indexed workshop metadata and coverage summary.
