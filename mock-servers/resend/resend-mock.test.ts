@@ -251,3 +251,20 @@ test(
 	},
 	{ timeout: defaultTimeoutMs },
 )
+
+test(
+	'resend mock ignores non-numeric limit query values',
+	async () => {
+		await using tempDir = await createTemporaryDirectory('resend-mock-limit-')
+		const token = 'test-mock-token'
+		await using server = await startMockResendWorker(tempDir.path, token)
+
+		const listUrl = new URL('/__mocks/messages', server.origin)
+		listUrl.searchParams.set('limit', 'abc')
+		const listResp = await fetch(listUrl, {
+			headers: { authorization: `Bearer ${token}` },
+		})
+		expect(listResp.status).toBe(200)
+	},
+	{ timeout: defaultTimeoutMs },
+)

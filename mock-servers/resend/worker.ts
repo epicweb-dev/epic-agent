@@ -301,10 +301,10 @@ async function handleGetMessages(
 		return json({ message })
 	}
 	const limitParam = url.searchParams.get('limit')?.trim() ?? ''
-	const limit = Math.min(
-		100,
-		Math.max(1, Number.parseInt(limitParam || '50', 10)),
-	)
+	const rawLimit = Number.parseInt(limitParam || '50', 10)
+	const limit = Number.isNaN(rawLimit)
+		? 50
+		: Math.min(100, Math.max(1, rawLimit))
 
 	const messages = await listMessages(env.APP_DB, tokenHash, limit)
 	return json({ count: messages.length, messages })
