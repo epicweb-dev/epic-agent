@@ -12,6 +12,8 @@ This folder documents the important runtime architecture for `epic-agent`.
   Objects.
 - [MCP Retrieval Tools](./mcp-retrieval-tools.md): tool contracts and retrieval
   behavior for workshop context.
+- [MCP Server Best Practices](../mcp-server-best-practices.md): metadata,
+  schema, and response patterns for high-quality MCP servers.
 
 ## Source of truth in code
 
