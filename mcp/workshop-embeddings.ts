@@ -39,4 +39,3 @@ export function prepareEmbeddingText({
 	const normalizedTruncated = roundTripUtf8(truncated).trim()
 	return normalizedTruncated.length === 0 ? '.' : normalizedTruncated
 }
-
