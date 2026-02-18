@@ -542,7 +542,9 @@ function ChatPage(handle: Handle) {
 	}
 
 	handle.queueTask(async (signal) => {
-		ensureConnection(signal)
+		// `queueTask` signals are aborted on each re-render; use the component
+		// connection signal so the Agent WebSocket survives UI updates.
+		ensureConnection(handle.signal)
 		try {
 			await loadInitialMessages(signal)
 		} catch {
