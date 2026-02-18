@@ -17,10 +17,175 @@ on:
           all.
         required: false
         default: ''
+      workshop_advanced_mcp_features:
+        description: advanced-mcp-features
+        required: false
+        type: boolean
+        default: false
+      workshop_advanced_react_apis:
+        description: advanced-react-apis
+        required: false
+        type: boolean
+        default: false
+      workshop_advanced_react_patterns:
+        description: advanced-react-patterns
+        required: false
+        type: boolean
+        default: false
+      workshop_advanced_typescript:
+        description: advanced-typescript
+        required: false
+        type: boolean
+        default: false
+      workshop_advanced_vitest_patterns:
+        description: advanced-vitest-patterns
+        required: false
+        type: boolean
+        default: false
+      workshop_beginner_javascript:
+        description: beginner-javascript
+        required: false
+        type: boolean
+        default: false
+      workshop_build_react_hooks:
+        description: build-react-hooks
+        required: false
+        type: boolean
+        default: false
+      workshop_data_modeling:
+        description: data-modeling
+        required: false
+        type: boolean
+        default: false
+      workshop_e2e_react_application_testing_with_playwright:
+        description: e2e-react-application-testing-with-playwright
+        required: false
+        type: boolean
+        default: false
+      workshop_epicshop_tutorial:
+        description: epicshop-tutorial
+        required: false
+        type: boolean
+        default: false
+      workshop_full_stack_foundations:
+        description: full-stack-foundations
+        required: false
+        type: boolean
+        default: false
+      workshop_full_stack_testing:
+        description: full-stack-testing
+        required: false
+        type: boolean
+        default: false
+      workshop_get_started_with_react:
+        description: get-started-with-react
+        required: false
+        type: boolean
+        default: false
+      workshop_mcp_auth:
+        description: mcp-auth
+        required: false
+        type: boolean
+        default: false
+      workshop_mcp_fundamentals:
+        description: mcp-fundamentals
+        required: false
+        type: boolean
+        default: false
+      workshop_mcp_ui:
+        description: mcp-ui
+        required: false
+        type: boolean
+        default: false
+      workshop_mocking_techniques:
+        description: mocking-techniques
+        required: false
+        type: boolean
+        default: false
+      workshop_object_oriented_typescript:
+        description: object-oriented-typescript
+        required: false
+        type: boolean
+        default: false
+      workshop_pixel_perfect_tailwind:
+        description: pixel-perfect-tailwind
+        required: false
+        type: boolean
+        default: false
+      workshop_programming_foundations:
+        description: programming-foundations
+        required: false
+        type: boolean
+        default: false
+      workshop_react_and_the_vanishing_network:
+        description: react-and-the-vanishing-network
+        required: false
+        type: boolean
+        default: false
+      workshop_react_component_testing_with_vitest:
+        description: react-component-testing-with-vitest
+        required: false
+        type: boolean
+        default: false
+      workshop_react_fundamentals:
+        description: react-fundamentals
+        required: false
+        type: boolean
+        default: false
+      workshop_react_hooks:
+        description: react-hooks
+        required: false
+        type: boolean
+        default: false
+      workshop_react_performance:
+        description: react-performance
+        required: false
+        type: boolean
+        default: false
+      workshop_react_server_components:
+        description: react-server-components
+        required: false
+        type: boolean
+        default: false
+      workshop_react_suspense:
+        description: react-suspense
+        required: false
+        type: boolean
+        default: false
+      workshop_structured_data:
+        description: structured-data
+        required: false
+        type: boolean
+        default: false
+      workshop_tailwindcss_color_tokens:
+        description: tailwindcss-color-tokens
+        required: false
+        type: boolean
+        default: false
+      workshop_testing_fundamentals:
+        description: testing-fundamentals
+        required: false
+        type: boolean
+        default: false
+      workshop_type_safety:
+        description: type-safety
+        required: false
+        type: boolean
+        default: false
+      workshop_web_auth:
+        description: web-auth
+        required: false
+        type: boolean
+        default: false
+      workshop_web_forms:
+        description: web-forms
+        required: false
+        type: boolean
+        default: false
       batchSize:
         description: Workshops processed per request (1-20)
         required: false
-        default: 5
+        default: 2
         type: number
 
 permissions:
@@ -46,13 +211,68 @@ jobs:
       - name: 📥 Install Dependencies
         run: bun install --frozen-lockfile
 
+      - name: 🧩 Resolve workshop selection
+        shell: bash
+        env:
+          WORKSHOPS_INPUT: ${{ inputs.workshops }}
+        run: |
+          selected="$WORKSHOPS_INPUT"
+
+          append_slug() {
+            local slug="$1"
+            if [[ -z "${selected//[[:space:]]/}" ]]; then
+              selected="$slug"
+              return
+            fi
+            selected="${selected}"$'\n'"$slug"
+          }
+
+          if [[ "${{ inputs.workshop_advanced_mcp_features }}" == "true" ]]; then append_slug "advanced-mcp-features"; fi
+          if [[ "${{ inputs.workshop_advanced_react_apis }}" == "true" ]]; then append_slug "advanced-react-apis"; fi
+          if [[ "${{ inputs.workshop_advanced_react_patterns }}" == "true" ]]; then append_slug "advanced-react-patterns"; fi
+          if [[ "${{ inputs.workshop_advanced_typescript }}" == "true" ]]; then append_slug "advanced-typescript"; fi
+          if [[ "${{ inputs.workshop_advanced_vitest_patterns }}" == "true" ]]; then append_slug "advanced-vitest-patterns"; fi
+          if [[ "${{ inputs.workshop_beginner_javascript }}" == "true" ]]; then append_slug "beginner-javascript"; fi
+          if [[ "${{ inputs.workshop_build_react_hooks }}" == "true" ]]; then append_slug "build-react-hooks"; fi
+          if [[ "${{ inputs.workshop_data_modeling }}" == "true" ]]; then append_slug "data-modeling"; fi
+          if [[ "${{ inputs.workshop_e2e_react_application_testing_with_playwright }}" == "true" ]]; then append_slug "e2e-react-application-testing-with-playwright"; fi
+          if [[ "${{ inputs.workshop_epicshop_tutorial }}" == "true" ]]; then append_slug "epicshop-tutorial"; fi
+          if [[ "${{ inputs.workshop_full_stack_foundations }}" == "true" ]]; then append_slug "full-stack-foundations"; fi
+          if [[ "${{ inputs.workshop_full_stack_testing }}" == "true" ]]; then append_slug "full-stack-testing"; fi
+          if [[ "${{ inputs.workshop_get_started_with_react }}" == "true" ]]; then append_slug "get-started-with-react"; fi
+          if [[ "${{ inputs.workshop_mcp_auth }}" == "true" ]]; then append_slug "mcp-auth"; fi
+          if [[ "${{ inputs.workshop_mcp_fundamentals }}" == "true" ]]; then append_slug "mcp-fundamentals"; fi
+          if [[ "${{ inputs.workshop_mcp_ui }}" == "true" ]]; then append_slug "mcp-ui"; fi
+          if [[ "${{ inputs.workshop_mocking_techniques }}" == "true" ]]; then append_slug "mocking-techniques"; fi
+          if [[ "${{ inputs.workshop_object_oriented_typescript }}" == "true" ]]; then append_slug "object-oriented-typescript"; fi
+          if [[ "${{ inputs.workshop_pixel_perfect_tailwind }}" == "true" ]]; then append_slug "pixel-perfect-tailwind"; fi
+          if [[ "${{ inputs.workshop_programming_foundations }}" == "true" ]]; then append_slug "programming-foundations"; fi
+          if [[ "${{ inputs.workshop_react_and_the_vanishing_network }}" == "true" ]]; then append_slug "react-and-the-vanishing-network"; fi
+          if [[ "${{ inputs.workshop_react_component_testing_with_vitest }}" == "true" ]]; then append_slug "react-component-testing-with-vitest"; fi
+          if [[ "${{ inputs.workshop_react_fundamentals }}" == "true" ]]; then append_slug "react-fundamentals"; fi
+          if [[ "${{ inputs.workshop_react_hooks }}" == "true" ]]; then append_slug "react-hooks"; fi
+          if [[ "${{ inputs.workshop_react_performance }}" == "true" ]]; then append_slug "react-performance"; fi
+          if [[ "${{ inputs.workshop_react_server_components }}" == "true" ]]; then append_slug "react-server-components"; fi
+          if [[ "${{ inputs.workshop_react_suspense }}" == "true" ]]; then append_slug "react-suspense"; fi
+          if [[ "${{ inputs.workshop_structured_data }}" == "true" ]]; then append_slug "structured-data"; fi
+          if [[ "${{ inputs.workshop_tailwindcss_color_tokens }}" == "true" ]]; then append_slug "tailwindcss-color-tokens"; fi
+          if [[ "${{ inputs.workshop_testing_fundamentals }}" == "true" ]]; then append_slug "testing-fundamentals"; fi
+          if [[ "${{ inputs.workshop_type_safety }}" == "true" ]]; then append_slug "type-safety"; fi
+          if [[ "${{ inputs.workshop_web_auth }}" == "true" ]]; then append_slug "web-auth"; fi
+          if [[ "${{ inputs.workshop_web_forms }}" == "true" ]]; then append_slug "web-forms"; fi
+
+          {
+            echo "WORKSHOP_LIST_INPUT<<EOF"
+            echo "$selected"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: 🚚 Load workshop content into D1 and Vectorize
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
-          WORKSHOP_LIST_INPUT: ${{ inputs.workshops }}
           WORKSHOP_BATCH_SIZE: ${{ inputs.batchSize }}
           WORKSHOP_VECTORIZE_INDEX_NAME:
             ${{ secrets.WORKSHOP_VECTORIZE_INDEX_NAME }}

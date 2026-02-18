@@ -1634,11 +1634,13 @@ export async function runWorkshopReindex({
 	onlyWorkshops,
 	cursor,
 	batchSize,
+	repositories: providedRepositories,
 }: {
 	env: WorkshopIndexEnv
 	onlyWorkshops?: Array<string>
 	cursor?: string
 	batchSize?: number
+	repositories?: Array<WorkshopRepository>
 }): Promise<IndexSummary> {
 	const db = env.APP_DB
 	const runId = await createIndexRun(db)
@@ -1658,7 +1660,15 @@ export async function runWorkshopReindex({
 	)
 
 	try {
-		const repositories = await listWorkshopRepositories({ env, onlyWorkshops })
+		const discoveredRepositories =
+			providedRepositories ??
+			(await listWorkshopRepositories({ env, onlyWorkshops }))
+		const repositories = [
+			...filterRequestedRepositories({
+				repositories: discoveredRepositories,
+				onlyWorkshops,
+			}),
+		].sort((left, right) => left.name.localeCompare(right.name))
 		const batch = resolveReindexRepositoryBatch({
 			repositories,
 			cursor,

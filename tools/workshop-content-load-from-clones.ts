@@ -2,7 +2,11 @@ import { readFileSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { z } from 'zod'
-import { createIndexRun, markIndexRunComplete } from '../mcp/workshop-data.ts'
+import {
+	createIndexRun,
+	markIndexRunComplete,
+	markIndexRunFailed,
+} from '../mcp/workshop-data.ts'
 import {
 	indexWorkshopFromResult,
 	listWorkshopRepositories,
@@ -10,8 +14,10 @@ import {
 } from '../mcp/workshop-indexer.ts'
 import { parseEpicshopContextToRepoIndexResult } from './workshop-context-adapter.ts'
 import { createTemporaryDirectory } from './temp-directory.ts'
+import { stripJsonc } from './strip-jsonc.ts'
 import {
 	workshopFilterMaxCount,
+	workshopIndexBatchDefaultSize,
 	workshopIndexBatchMaxSize,
 } from '../shared/workshop-index-constants.ts'
 
@@ -19,13 +25,6 @@ type WorkshopRepository = {
 	owner: string
 	name: string
 	defaultBranch: string
-}
-
-function stripJsonc(value: string) {
-	return value
-		.replace(/\/\*[\s\S]*?\*\//g, '')
-		.replace(/^\s*\/\/.*$/gm, '')
-		.replace(/,\s*([}\]])/g, '$1')
 }
 
 type WranglerConfig = {
@@ -281,7 +280,8 @@ async function main() {
 		TARGET_ENVIRONMENT: environmentRaw,
 	})
 
-	const batchSizeRaw = process.env.WORKSHOP_BATCH_SIZE ?? '5'
+	const batchSizeRaw =
+		process.env.WORKSHOP_BATCH_SIZE ?? String(workshopIndexBatchDefaultSize)
 	const batchSize = parseIntegerInput(batchSizeRaw, 'batchSize')
 	if (batchSize === null) {
 		throw new Error('batchSize is required.')
@@ -319,7 +319,7 @@ async function main() {
 	})
 
 	const startedAt = Date.now()
-	const runIds: Array<string> = []
+	let runId: string | null = null
 	let totalWorkshopCount = 0
 	let totalExerciseCount = 0
 	let totalStepCount = 0
@@ -336,6 +336,34 @@ async function main() {
 			onlyWorkshops,
 		})
 
+		const createdRunId = await createIndexRun(db)
+		runId = createdRunId
+		console.info(
+			'workshop-reindex-start',
+			JSON.stringify({
+				runId: createdRunId,
+				repositoryCount: repositories.length,
+				onlyWorkshops: onlyWorkshops?.length ?? 0,
+				timestamp: new Date(startedAt).toISOString(),
+			}),
+		)
+
+		const initialBatch = resolveReindexRepositoryBatch({
+			repositories,
+			cursor,
+			batchSize,
+		})
+		console.info(
+			'workshop-reindex-discovery',
+			JSON.stringify({
+				runId: createdRunId,
+				repositoryCount: repositories.length,
+				offset: initialBatch.offset,
+				limit: initialBatch.limit,
+				batchCount: initialBatch.batch.length,
+			}),
+		)
+
 		while (true) {
 			iteration += 1
 			if (iteration > 500) {
@@ -350,25 +378,7 @@ async function main() {
 				batchSize,
 			})
 
-			console.info(
-				'workshop-reindex-discovery',
-				JSON.stringify({
-					runId: 'pending',
-					repositoryCount: repositories.length,
-					offset: batch.offset,
-					limit: batch.limit,
-					batchCount: batch.batch.length,
-				}),
-			)
-
 			if (batch.batch.length === 0) break
-
-			const runId = await createIndexRun(db)
-			let batchWorkshopCount = 0
-			let batchExerciseCount = 0
-			let batchStepCount = 0
-			let batchSectionCount = 0
-			let batchSectionChunkCount = 0
 
 			for (const repo of batch.batch) {
 				const repoStart = Date.now()
@@ -414,16 +424,10 @@ async function main() {
 
 				const stats = await indexWorkshopFromResult({
 					env: env as Parameters<typeof indexWorkshopFromResult>[0]['env'],
-					runId,
+					runId: createdRunId,
 					workshopSlug: repo.name,
 					result,
 				})
-
-				batchWorkshopCount += 1
-				batchExerciseCount += stats.exerciseCount
-				batchStepCount += stats.stepCount
-				batchSectionCount += stats.sectionCount
-				batchSectionChunkCount += stats.sectionChunkCount
 
 				totalWorkshopCount += 1
 				totalExerciseCount += stats.exerciseCount
@@ -434,7 +438,7 @@ async function main() {
 				console.info(
 					'workshop-reindex-repository-complete',
 					JSON.stringify({
-						runId,
+						runId: createdRunId,
 						repository: repo.name,
 						exerciseCount: stats.exerciseCount,
 						stepCount: stats.stepCount,
@@ -447,21 +451,19 @@ async function main() {
 				)
 			}
 
-			await markIndexRunComplete({
-				db,
-				runId,
-				workshopCount: batchWorkshopCount,
-				exerciseCount: batchExerciseCount,
-				stepCount: batchStepCount,
-				sectionCount: batchSectionCount,
-				sectionChunkCount: batchSectionChunkCount,
-			})
-
-			runIds.push(runId)
-
 			cursor = batch.nextCursor
 			if (!cursor) break
 		}
+
+		await markIndexRunComplete({
+			db,
+			runId: createdRunId,
+			workshopCount: totalWorkshopCount,
+			exerciseCount: totalExerciseCount,
+			stepCount: totalStepCount,
+			sectionCount: totalSectionCount,
+			sectionChunkCount: totalSectionChunkCount,
+		})
 
 		const durationMs = Date.now() - startedAt
 		const workshopsLabel = onlyWorkshops?.length
@@ -476,7 +478,7 @@ async function main() {
 				`- D1 database id: ${d1DatabaseId}`,
 				`- Batch size: ${batchSize}`,
 				`- Requested workshops: ${workshopsLabel}`,
-				`- Reindex run ids: ${runIds.join(', ')}`,
+				`- Reindex run id: ${createdRunId}`,
 				`- Workshop count: ${totalWorkshopCount}`,
 				`- Exercise count: ${totalExerciseCount}`,
 				`- Step count: ${totalStepCount}`,
@@ -488,6 +490,28 @@ async function main() {
 		)
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
+		if (runId) {
+			try {
+				await markIndexRunFailed({
+					db,
+					runId,
+					errorMessage: message.slice(0, 4000),
+				})
+			} catch (markFailedError) {
+				const markFailedMessage =
+					markFailedError instanceof Error
+						? markFailedError.message
+						: String(markFailedError)
+				console.error(
+					'workshop-reindex-failed-status-write-error',
+					JSON.stringify({
+						runId,
+						originalError: message,
+						markFailedError: markFailedMessage,
+					}),
+				)
+			}
+		}
 		console.error(
 			'workshop-reindex-failed',
 			JSON.stringify({
