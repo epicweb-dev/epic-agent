@@ -340,6 +340,56 @@ test('chunkIntoBatches clamps invalid batch sizes', () => {
 	expect(batches).toEqual([[1], [2], [3]])
 })
 
+test('embedChunksIfConfigured fails after retrying Workers AI capacity errors', async () => {
+	let embeddingCalls = 0
+	let upsertCalls = 0
+	const env = {
+		WORKSHOP_VECTOR_INDEX: {
+			async upsert() {
+				upsertCalls += 1
+			},
+		} as unknown as Vectorize,
+		AI: {
+			async run() {
+				embeddingCalls += 1
+				throw new Error(
+					'Cloudflare API POST /accounts/demo/ai/run/@cf/baai/bge-base-en-v1.5 failed (HTTP 429): AiError: AiError: Capacity temporarily exceeded, please try again. (deadbeef) (3040)',
+				)
+			},
+		} as unknown as Ai,
+	} as unknown as Env
+
+	const sectionChunks = [
+		{ sectionOrder: 10, chunkIndex: 0, content: 'hello world' },
+		{ sectionOrder: 10, chunkIndex: 1, content: 'goodbye world' },
+	]
+
+	let thrown: unknown = null
+	try {
+		await workshopIndexerTestUtils.embedChunksIfConfigured({
+			env,
+			runId: 'run-test',
+			workshopSlug: 'example-workshop',
+			sectionChunks,
+			embeddingRetry: {
+				maxAttempts: 3,
+				baseDelayMs: 0,
+				maxDelayMs: 0,
+				wait: async () => {},
+			},
+		})
+	} catch (error) {
+		thrown = error
+	}
+
+	expect(thrown).toBeInstanceOf(Error)
+	expect((thrown as Error).message.toLowerCase()).toContain(
+		'capacity temporarily exceeded',
+	)
+	expect(embeddingCalls).toBe(3)
+	expect(upsertCalls).toBe(0)
+})
+
 test('buildUniqueVectorIdBatches dedupes and chunks vector ids', () => {
 	const batches = workshopIndexerTestUtils.buildUniqueVectorIdBatches({
 		vectorIds: [' alpha ', 'beta', '', 'beta', 'gamma', 'delta'],

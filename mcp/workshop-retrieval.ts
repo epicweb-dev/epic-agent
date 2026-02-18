@@ -10,6 +10,10 @@ import {
 } from './workshop-truncation.ts'
 import { prepareEmbeddingText } from './workshop-embeddings.ts'
 import {
+	getErrorMessage,
+	isWorkersAiCapacityError,
+} from './workers-ai-errors.ts'
+import {
 	listWorkshopsMaxLimit,
 	topicSearchMaxLimit,
 	type RetrieveLearningContextInput,
@@ -841,52 +845,7 @@ export async function searchTopicContext({
 		vectorId: string
 	}> = []
 
-	if (vectorIndex && ai) {
-		const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
-		const vectorMatches = await vectorIndex.query(embedding, {
-			topK,
-			returnMetadata: 'indexed',
-			filter: Object.keys(filter).length > 0 ? filter : undefined,
-		})
-		const vectorIds = Array.from(
-			new Set(
-				vectorMatches.matches
-					.map((match) => match.id?.trim())
-					.filter((vectorId): vectorId is string => Boolean(vectorId)),
-			),
-		)
-		const chunkRowsByVectorId = await loadTopicChunkRows({
-			db: env.APP_DB,
-			vectorIds,
-		})
-
-		const seenVectorIds = new Set<string>()
-		for (const match of vectorMatches.matches) {
-			const vectorId = match.id?.trim()
-			if (!vectorId) continue
-			if (seenVectorIds.has(vectorId)) continue
-			seenVectorIds.add(vectorId)
-			const row = chunkRowsByVectorId.get(vectorId)
-			if (!row?.chunk_content || !row.workshop_slug) continue
-			results.push({
-				score: match.score,
-				workshop: row.workshop_slug,
-				exerciseNumber: row.exercise_number ?? undefined,
-				stepNumber: row.step_number ?? undefined,
-				sectionKind: row.section_kind ?? undefined,
-				sectionLabel: row.label ?? undefined,
-				sourcePath: row.source_path ?? undefined,
-				chunk: row.chunk_content,
-				vectorId,
-			})
-		}
-	} else {
-		mode = 'keyword'
-		warnings.push(
-			'Vector search bindings are not configured (WORKSHOP_VECTOR_INDEX and/or AI). Falling back to basic keyword search.',
-		)
-		warnings.push(buildVectorSearchSetupHint())
-
+	async function runKeywordFallback() {
 		const keywordChunkRows = await keywordSearchTopicChunks({
 			db: env.APP_DB,
 			query: normalizedQuery,
@@ -949,6 +908,77 @@ export async function searchTopicContext({
 				})
 			}
 		}
+	}
+
+	if (vectorIndex && ai) {
+		try {
+			const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
+			const vectorMatches = await vectorIndex.query(embedding, {
+				topK,
+				returnMetadata: 'indexed',
+				filter: Object.keys(filter).length > 0 ? filter : undefined,
+			})
+			const vectorIds = Array.from(
+				new Set(
+					vectorMatches.matches
+						.map((match) => match.id?.trim())
+						.filter((vectorId): vectorId is string => Boolean(vectorId)),
+				),
+			)
+			const chunkRowsByVectorId = await loadTopicChunkRows({
+				db: env.APP_DB,
+				vectorIds,
+			})
+
+			const seenVectorIds = new Set<string>()
+			for (const match of vectorMatches.matches) {
+				const vectorId = match.id?.trim()
+				if (!vectorId) continue
+				if (seenVectorIds.has(vectorId)) continue
+				seenVectorIds.add(vectorId)
+				const row = chunkRowsByVectorId.get(vectorId)
+				if (!row?.chunk_content || !row.workshop_slug) continue
+				results.push({
+					score: match.score,
+					workshop: row.workshop_slug,
+					exerciseNumber: row.exercise_number ?? undefined,
+					stepNumber: row.step_number ?? undefined,
+					sectionKind: row.section_kind ?? undefined,
+					sectionLabel: row.label ?? undefined,
+					sourcePath: row.source_path ?? undefined,
+					chunk: row.chunk_content,
+					vectorId,
+				})
+			}
+
+			if (results.length === 0) {
+				mode = 'keyword'
+				warnings.push(
+					'Vector search returned no resolved topic matches. Falling back to basic keyword search.',
+				)
+				await runKeywordFallback()
+			}
+		} catch (error) {
+			mode = 'keyword'
+			const message = getErrorMessage(error)
+			if (isWorkersAiCapacityError(error)) {
+				warnings.push(
+					'Workers AI capacity temporarily exceeded while embedding the query. Falling back to basic keyword search.',
+				)
+			} else {
+				warnings.push(
+					`Vector search failed (${message.slice(0, 200)}). Falling back to basic keyword search.`,
+				)
+			}
+			await runKeywordFallback()
+		}
+	} else {
+		mode = 'keyword'
+		warnings.push(
+			'Vector search bindings are not configured (WORKSHOP_VECTOR_INDEX and/or AI). Falling back to basic keyword search.',
+		)
+		warnings.push(buildVectorSearchSetupHint())
+		await runKeywordFallback()
 	}
 
 	console.info(

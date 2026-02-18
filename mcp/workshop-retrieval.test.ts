@@ -429,6 +429,54 @@ test('searchTopicContext falls back to keyword search without vector bindings', 
 	expect(result.matches.length).toBe(1)
 })
 
+test('searchTopicContext falls back to keyword search when Workers AI capacity is exceeded', async () => {
+	let embeddingCalls = 0
+	let queryCalls = 0
+	const ai = {
+		async run() {
+			embeddingCalls += 1
+			throw new Error(
+				'Cloudflare API POST /accounts/demo/ai/run/@cf/baai/bge-base-en-v1.5 failed (HTTP 429): AiError: AiError: Capacity temporarily exceeded, please try again. (deadbeef) (3040)',
+			)
+		},
+	} as unknown as Ai
+	const vectorIndex = {
+		async query() {
+			queryCalls += 1
+			return { matches: [], count: 0 }
+		},
+	} as unknown as Vectorize
+
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		chunkRows: [
+			{
+				id: 1,
+				workshop_slug: 'mcp-fundamentals',
+				content: 'MCP intro and architecture details live here.',
+			},
+		],
+	})
+	const env = {
+		AI: ai,
+		WORKSHOP_VECTOR_INDEX: vectorIndex,
+		APP_DB: db,
+	} as unknown as Env
+
+	const result = await searchTopicContext({
+		env,
+		query: 'architecture',
+	})
+
+	expect(result.mode).toBe('keyword')
+	expect(result.vectorSearchAvailable).toBe(true)
+	expect(result.keywordSource).toBe('chunks')
+	expect(result.warnings?.join('\n')).toContain('capacity temporarily exceeded')
+	expect(result.matches.length).toBe(1)
+	expect(embeddingCalls).toBe(1)
+	expect(queryCalls).toBe(0)
+})
+
 async function runRetrieveWorkshopListWithFixedRows({
 	limit,
 	rows,

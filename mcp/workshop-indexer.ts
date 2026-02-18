@@ -15,6 +15,11 @@ import {
 	workshopIndexBatchMaxSize,
 } from '../shared/workshop-index-constants.ts'
 import { prepareEmbeddingText } from './workshop-embeddings.ts'
+import {
+	getErrorMessage,
+	isWorkersAiCapacityError,
+	isWorkersAiInvalidInputError,
+} from './workers-ai-errors.ts'
 
 type WorkshopRepository = {
 	owner: string
@@ -69,6 +74,9 @@ const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
 const defaultVectorUpsertBatchSize = 200
+const workersAiEmbeddingMaxAttempts = 8
+const workersAiEmbeddingRetryBaseDelayMs = 1_000
+const workersAiEmbeddingRetryMaxDelayMs = 30_000
 // Vectorize id max is 64 bytes.
 const maxVectorIdBytes = 64
 // Vectorize delete_by_ids currently caps payloads at 100 ids.
@@ -353,6 +361,7 @@ async function embedChunksIfConfigured({
 	runId,
 	workshopSlug,
 	sectionChunks,
+	embeddingRetry,
 }: {
 	env: WorkshopIndexEnv
 	runId: string
@@ -364,6 +373,12 @@ async function embedChunksIfConfigured({
 			sectionOrder: number
 		}
 	>
+	embeddingRetry?: Partial<{
+		maxAttempts: number
+		baseDelayMs: number
+		maxDelayMs: number
+		wait: typeof wait
+	}>
 }) {
 	if (sectionChunks.length === 0) return sectionChunks
 	const vectorIndex = env.WORKSHOP_VECTOR_INDEX
@@ -372,14 +387,73 @@ async function embedChunksIfConfigured({
 		return sectionChunks
 	}
 	const aiClient = ai
+	const retryConfig = {
+		maxAttempts: Math.max(
+			1,
+			embeddingRetry?.maxAttempts ?? workersAiEmbeddingMaxAttempts,
+		),
+		baseDelayMs: Math.max(
+			0,
+			embeddingRetry?.baseDelayMs ?? workersAiEmbeddingRetryBaseDelayMs,
+		),
+		maxDelayMs: Math.max(
+			0,
+			embeddingRetry?.maxDelayMs ?? workersAiEmbeddingRetryMaxDelayMs,
+		),
+		waitFn: embeddingRetry?.wait ?? wait,
+	}
+
+	async function runEmbeddingModel(text: Array<string>) {
+		for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt += 1) {
+			try {
+				return await aiClient.run('@cf/baai/bge-base-en-v1.5', { text })
+			} catch (error) {
+				if (
+					isWorkersAiCapacityError(error) &&
+					attempt < retryConfig.maxAttempts
+				) {
+					const retryDelayMs = resolveRetryDelayMs({
+						attempt,
+						baseDelayMs: retryConfig.baseDelayMs,
+						maxDelayMs: retryConfig.maxDelayMs,
+					})
+					console.warn(
+						'workshop-reindex-embedding-retry',
+						JSON.stringify({
+							runId,
+							workshopSlug,
+							attempt,
+							maxAttempts: retryConfig.maxAttempts,
+							retryDelayMs,
+							batchSize: text.length,
+							error: getErrorMessage(error).slice(0, 200),
+						}),
+					)
+					await retryConfig.waitFn(retryDelayMs)
+					continue
+				}
+				if (isWorkersAiCapacityError(error)) {
+					throw new Error(
+						[
+							`Workers AI capacity temporarily exceeded while embedding workshop "${workshopSlug}".`,
+							`Retried ${attempt}/${retryConfig.maxAttempts} times and still received capacity errors.`,
+							'Failing the index run so it can be retried later.',
+							`Last error: ${getErrorMessage(error).slice(0, 200)}`,
+						].join(' '),
+						{ cause: error },
+					)
+				}
+				throw error
+			}
+		}
+		throw new Error('Embedding retry loop did not return a result.')
+	}
 
 	async function embedBatch(
 		texts: Array<string>,
 	): Promise<Array<Array<number>>> {
 		if (texts.length === 0) return []
-		const embeddingResponse = (await aiClient.run('@cf/baai/bge-base-en-v1.5', {
-			text: texts,
-		})) as unknown
+		const embeddingResponse = (await runEmbeddingModel(texts)) as unknown
 		let batchVectors: Array<Array<number>> = []
 		if (
 			embeddingResponse &&
@@ -409,11 +483,8 @@ async function embedChunksIfConfigured({
 		try {
 			return await embedBatch(texts)
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error)
-			if (
-				texts.length > 1 &&
-				(msg.includes('invalid input') || msg.includes('3010'))
-			) {
+			const msg = getErrorMessage(error)
+			if (texts.length > 1 && isWorkersAiInvalidInputError(error)) {
 				const mid = Math.floor(texts.length / 2)
 				const [left, right] = await Promise.all([
 					embedWithRetry(chunkBatch.slice(0, mid)),
@@ -859,6 +930,7 @@ export const workshopIndexerTestUtils = {
 	filterRequestedRepositories,
 	splitIntoChunks,
 	chunkIntoBatches,
+	embedChunksIfConfigured,
 	buildUniqueVectorIdBatches,
 	collectVectorIds,
 	deleteVectorIdsIfConfigured,
