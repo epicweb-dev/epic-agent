@@ -21,6 +21,27 @@ function fail(message: string): never {
 	process.exit(1)
 }
 
+function readFlagValue(
+	argv: Array<string>,
+	index: number,
+	flag: string,
+	label: string,
+	options: { allowEmpty?: boolean } = {},
+) {
+	const value = argv[index + 1]
+	if (value === undefined) {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	if (!options.allowEmpty && value.trim().length === 0) {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	// When users forget the value, the next flag often gets consumed.
+	if (value.startsWith('-') && value !== '-') {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	return value
+}
+
 function parseArgs(argv: Array<string>): CliOptions {
 	const options: CliOptions = {
 		env: undefined,
@@ -38,45 +59,48 @@ function parseArgs(argv: Array<string>): CliOptions {
 		if (!arg) continue
 		switch (arg) {
 			case '--env': {
-				const envName = argv[index + 1]
-				if (envName === undefined) {
-					fail('Missing value for --env <environment>')
-				}
-				options.env = envName
+				options.env = readFlagValue(argv, index, '--env', '<environment>', {
+					allowEmpty: true,
+				})
 				index += 1
 				break
 			}
 			case '--name': {
-				options.name = argv[index + 1] ?? ''
+				options.name = readFlagValue(argv, index, '--name', '<worker-name>')
 				index += 1
 				break
 			}
 			case '--config': {
-				options.config = argv[index + 1] ?? ''
+				options.config = readFlagValue(argv, index, '--config', '<path>')
 				index += 1
 				break
 			}
 			case '--from-dotenv': {
-				const path = argv[index + 1] ?? ''
-				if (path) options.dotenvPaths.push(path)
+				const path = readFlagValue(argv, index, '--from-dotenv', '<path>')
+				options.dotenvPaths.push(path)
 				index += 1
 				break
 			}
 			case '--set': {
-				const pair = argv[index + 1] ?? ''
-				if (pair) options.setPairs.push(pair)
+				const pair = readFlagValue(argv, index, '--set', '<KEY=VALUE>')
+				options.setPairs.push(pair)
 				index += 1
 				break
 			}
 			case '--set-from-env': {
-				const key = argv[index + 1] ?? ''
-				if (key) options.setFromEnv.push(key)
+				const key = readFlagValue(argv, index, '--set-from-env', '<KEY>')
+				options.setFromEnv.push(key)
 				index += 1
 				break
 			}
 			case '--set-from-env-optional': {
-				const key = argv[index + 1] ?? ''
-				if (key) options.setFromEnvOptional.push(key)
+				const key = readFlagValue(
+					argv,
+					index,
+					'--set-from-env-optional',
+					'<KEY>',
+				)
+				options.setFromEnvOptional.push(key)
 				index += 1
 				break
 			}
@@ -160,7 +184,7 @@ async function buildSecrets(options: CliOptions) {
 
 	for (const key of options.setFromEnv) {
 		const value = process.env[key]
-		if (typeof value !== 'string') {
+		if (typeof value !== 'string' || value.length === 0) {
 			fail(`Missing required environment variable: ${key}`)
 		}
 		secrets.set(key, value)

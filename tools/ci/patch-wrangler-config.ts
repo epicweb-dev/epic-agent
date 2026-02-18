@@ -18,6 +18,25 @@ function fail(message: string): never {
 	process.exit(1)
 }
 
+function readFlagValue(
+	argv: Array<string>,
+	index: number,
+	flag: string,
+	label: string,
+) {
+	const value = argv[index + 1]
+	if (value === undefined) {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	if (value.trim().length === 0) {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	if (value.startsWith('-') && value !== '-') {
+		fail(`Missing value for ${flag} ${label}`)
+	}
+	return value
+}
+
 function parseArgs(argv: Array<string>): CliOptions {
 	const options: CliOptions = {}
 	for (let index = 0; index < argv.length; index += 1) {
@@ -26,47 +45,67 @@ function parseArgs(argv: Array<string>): CliOptions {
 
 		switch (arg) {
 			case '--input': {
-				options.input = argv[index + 1]
+				options.input = readFlagValue(argv, index, '--input', '<path>')
 				index += 1
 				break
 			}
 			case '--output': {
-				options.output = argv[index + 1]
+				options.output = readFlagValue(argv, index, '--output', '<path>')
 				index += 1
 				break
 			}
 			case '--env': {
-				options.env = argv[index + 1]
+				options.env = readFlagValue(argv, index, '--env', '<name>')
 				index += 1
 				break
 			}
 			case '--d1-binding': {
-				options.d1Binding = argv[index + 1]
+				options.d1Binding = readFlagValue(argv, index, '--d1-binding', '<name>')
 				index += 1
 				break
 			}
 			case '--d1-database-name': {
-				options.d1DatabaseName = argv[index + 1]
+				options.d1DatabaseName = readFlagValue(
+					argv,
+					index,
+					'--d1-database-name',
+					'<name>',
+				)
 				index += 1
 				break
 			}
 			case '--d1-database-id': {
-				options.d1DatabaseId = argv[index + 1]
+				options.d1DatabaseId = readFlagValue(
+					argv,
+					index,
+					'--d1-database-id',
+					'<uuid>',
+				)
 				index += 1
 				break
 			}
 			case '--kv-binding': {
-				options.kvBinding = argv[index + 1]
+				options.kvBinding = readFlagValue(argv, index, '--kv-binding', '<name>')
 				index += 1
 				break
 			}
 			case '--kv-namespace-id': {
-				options.kvNamespaceId = argv[index + 1]
+				options.kvNamespaceId = readFlagValue(
+					argv,
+					index,
+					'--kv-namespace-id',
+					'<id>',
+				)
 				index += 1
 				break
 			}
 			case '--kv-preview-id': {
-				options.kvPreviewId = argv[index + 1]
+				options.kvPreviewId = readFlagValue(
+					argv,
+					index,
+					'--kv-preview-id',
+					'<id>',
+				)
 				index += 1
 				break
 			}
@@ -175,17 +214,19 @@ async function main() {
 	const d1Binding = options.d1Binding?.trim() ?? ''
 	const d1DatabaseName = options.d1DatabaseName?.trim() ?? ''
 	const d1DatabaseId = options.d1DatabaseId?.trim() ?? ''
-	if (d1Binding && (d1DatabaseName || d1DatabaseId)) {
+	const hasAnyD1 = Boolean(d1Binding || d1DatabaseName || d1DatabaseId)
+	if (hasAnyD1) {
+		if (!d1Binding || !d1DatabaseName || !d1DatabaseId) {
+			fail(
+				'D1 patch requires --d1-binding, --d1-database-name, and --d1-database-id.',
+			)
+		}
 		patchD1Database(parsed, {
 			envName,
 			binding: d1Binding,
 			databaseName: assertString(d1DatabaseName, '--d1-database-name <name>'),
 			databaseId: assertString(d1DatabaseId, '--d1-database-id <uuid>'),
 		})
-	} else if (d1Binding || d1DatabaseName || d1DatabaseId) {
-		fail(
-			'D1 patch requires --d1-binding, --d1-database-name, and --d1-database-id.',
-		)
 	}
 
 	const kvBinding = options.kvBinding?.trim() ?? ''
