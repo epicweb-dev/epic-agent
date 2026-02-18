@@ -358,18 +358,18 @@ function ChatPage(handle: Handle) {
 								cursor: canSend ? 'pointer' : 'not-allowed',
 								opacity: canSend ? 1 : 0.7,
 								transition: `transform ${transitions.fast}, background-color ${transitions.normal}`,
-								'&:hover': canSend
+								...(canSend
 									? {
-											backgroundColor: colors.primaryHover,
-											transform: 'translateY(-1px)',
+											'&:hover': {
+												backgroundColor: colors.primaryHover,
+												transform: 'translateY(-1px)',
+											},
+											'&:active': {
+												backgroundColor: colors.primaryActive,
+												transform: 'translateY(0)',
+											},
 										}
-									: undefined,
-								'&:active': canSend
-									? {
-											backgroundColor: colors.primaryActive,
-											transform: 'translateY(0)',
-										}
-									: undefined,
+									: {}),
 							}}
 						>
 							{isSending ? 'Sending...' : 'Send'}
