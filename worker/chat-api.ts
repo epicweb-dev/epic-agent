@@ -58,7 +58,7 @@ function planTurn(message: string): ToolCallPlan {
 
 	if (text === '/tools') return { kind: 'list-tools' }
 
-	const toolMatch = text.match(/^\/tool\s+([a-zA-Z0-9_:-]+)(?:\s+(.+))?$/)
+	const toolMatch = text.match(/^\/tool\s+([a-zA-Z0-9_:-]+)(?:\s+(.+))?$/s)
 	if (toolMatch) {
 		const toolName = toolMatch[1]
 		if (!toolName) {
@@ -99,7 +99,7 @@ function planTurn(message: string): ToolCallPlan {
 		}
 	}
 
-	const searchMatch = text.match(/^search\s+(.+)$/i)
+	const searchMatch = text.match(/^search\s+(.+)$/is)
 	if (searchMatch) {
 		const query = searchMatch[1]?.trim() ?? ''
 		if (query.length < 3) {
