@@ -8,10 +8,7 @@ export type MarkdownSection = {
 }
 
 export function joinLines(lines: Array<string>) {
-	return lines.reduce(
-		(acc, line) => (acc.length > 0 ? `${acc}\n${line}` : line),
-		'',
-	)
+	return lines.join('\n')
 }
 
 export function formatBullets(items: Array<string>) {
