@@ -47,3 +47,15 @@ We use bun for installing dependencies and running scripts. Do not use npm.
 - [Request Lifecycle](./docs/architecture/request-lifecycle.md)
 - [Authentication](./docs/architecture/authentication.md)
 - [Data Storage](./docs/architecture/data-storage.md)
+
+## Cloud-specific instructions
+
+- Bun is pre-installed in the VM. Verify with `bun --version`; if missing,
+  install via `curl -fsSL https://bun.sh/install | bash`.
+- The dev server (`bun run dev`) defaults to `localhost:3742`. Wrangler handles
+  D1, KV, and Durable Objects locally; Vectorize and AI bindings are unavailable
+  in local mode (keyword fallback is used).
+- Stop the dev server before running `bun run validate`; the E2E tests start
+  their own preview server on port 8788 and will fail if that port is occupied.
+- See `docs/agents/setup.md` for all commands (lint, typecheck, build, test,
+  dev).
