@@ -14,14 +14,18 @@ function roundTripUtf8(value: string) {
 function truncateUtf16Safely(value: string, maxChars: number) {
 	const max = Math.max(1, Math.floor(maxChars))
 	if (value.length <= max) return value
-	let truncated = value.slice(0, max)
-	const lastCodeUnit = truncated.charCodeAt(truncated.length - 1)
-	// If we cut off after a high surrogate, drop it so we don't send a dangling
-	// surrogate to Workers AI (Cloudflare returns AiError 3010 invalid input).
-	if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
-		truncated = truncated.slice(0, -1)
-	}
-	return truncated
+	const lastCodeUnit = value.charCodeAt(max - 1)
+	const nextCodeUnit = value.charCodeAt(max)
+
+	const isHighSurrogate = lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff
+	const isLowSurrogate = nextCodeUnit >= 0xdc00 && nextCodeUnit <= 0xdfff
+
+	// If we cut between a surrogate pair, include the matching low surrogate so we
+	// keep the emoji intact rather than dropping it. This can exceed the UTF-16
+	// code-unit cap by 1, but does not increase Unicode code points and avoids
+	// Cloudflare Workers AI rejecting invalid Unicode (AiError 3010).
+	const end = isHighSurrogate && isLowSurrogate ? max + 1 : max
+	return value.slice(0, end)
 }
 
 export function prepareEmbeddingText({
