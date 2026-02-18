@@ -23,7 +23,11 @@ const chatTurnRequestSchema = z.object({
 type ToolCallPlan =
 	| { kind: 'help'; content: string }
 	| { kind: 'list-tools' }
-	| { kind: 'call-tool'; toolName: string; toolArguments: unknown }
+	| {
+			kind: 'call-tool'
+			toolName: string
+			toolArguments: Record<string, unknown>
+	  }
 
 function getTextResultContent(result: CallToolResult) {
 	return (
@@ -56,13 +60,26 @@ function planTurn(message: string): ToolCallPlan {
 	const toolMatch = text.match(/^\/tool\s+([a-zA-Z0-9_:-]+)(?:\s+(.+))?$/)
 	if (toolMatch) {
 		const toolName = toolMatch[1]
+		if (!toolName) {
+			return { kind: 'help', content: buildHelpMessage() }
+		}
 		const argsText = toolMatch[2]?.trim() ?? ''
 		if (!argsText) {
 			return { kind: 'call-tool', toolName, toolArguments: {} }
 		}
 		try {
 			const parsed = JSON.parse(argsText) as unknown
-			return { kind: 'call-tool', toolName, toolArguments: parsed }
+			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+				return {
+					kind: 'help',
+					content: `Tool arguments must be a JSON object.\n\n${buildHelpMessage()}`,
+				}
+			}
+			return {
+				kind: 'call-tool',
+				toolName,
+				toolArguments: parsed as Record<string, unknown>,
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			return {
