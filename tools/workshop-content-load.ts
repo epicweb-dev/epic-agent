@@ -359,29 +359,44 @@ class RemoteD1Database {
 		})
 
 		const path = `/accounts/${this.#accountId}/d1/database/${this.#databaseId}/query`
-		// Cloudflare's D1 REST API now expects an object payload for batched queries.
-		// Older versions accepted a top-level array, so we keep a compatibility
-		// fallback for environments that haven't rolled forward yet.
-		let result: Array<RemoteD1Result<T>>
-		try {
-			result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
-				apiToken: this.#apiToken,
-				path,
-				method: 'POST',
-				body: { statements: queries },
-			})
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			if (message.includes('Expected array, received object')) {
+		const candidates: Array<unknown> = [
+			{ batch: queries },
+			{ statements: queries },
+			queries,
+		]
+
+		function isPayloadShapeError(message: string) {
+			if (!message.includes('(HTTP 400)')) return false
+			return (
+				message.includes('Invalid property') ||
+				message.includes('Expected array, received object') ||
+				message.includes('Unknown property')
+			)
+		}
+
+		let result: Array<RemoteD1Result<T>> | null = null
+		let lastError: unknown = null
+
+		for (const body of candidates) {
+			try {
 				result = await cloudflareRequestJson<Array<RemoteD1Result<T>>>({
 					apiToken: this.#apiToken,
 					path,
 					method: 'POST',
-					body: queries,
+					body,
 				})
-			} else {
-				throw error
+				break
+			} catch (error) {
+				lastError = error
+				const message = error instanceof Error ? error.message : String(error)
+				if (!isPayloadShapeError(message)) throw error
 			}
+		}
+
+		if (!result) {
+			throw lastError instanceof Error
+				? lastError
+				: new Error(String(lastError ?? 'Unknown D1 batch error'))
 		}
 		for (const [index, entry] of result.entries()) {
 			if (entry?.success === true) continue
@@ -741,6 +756,56 @@ const envSchema = z.object({
 	TARGET_ENVIRONMENT: z.enum(['production', 'preview']),
 })
 
+export async function buildWorkshopLoadEnv({
+	parsedEnv,
+	d1DatabaseId,
+	vectorizeIndexName,
+}: {
+	parsedEnv: z.infer<typeof envSchema>
+	d1DatabaseId: string
+	vectorizeIndexName: VectorizeIndexResolution
+}) {
+	const db = new RemoteD1Database({
+		accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
+		apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
+		databaseId: d1DatabaseId,
+	}) as unknown as D1Database
+
+	const vectorizeStrict =
+		vectorizeIndexName.enabled && vectorizeIndexName.source !== 'default'
+	const vectorizeSetup = vectorizeIndexName.enabled
+		? await ensureVectorizeIndexReady({
+				accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
+				apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
+				indexName: vectorizeIndexName.indexName,
+				strict: vectorizeStrict,
+			})
+		: { enabled: false as const, indexName: undefined, created: false }
+	const vectorizeEnabled = vectorizeIndexName.enabled && vectorizeSetup.enabled
+
+	const env: Env = {
+		APP_DB: db,
+		...(process.env.GITHUB_TOKEN
+			? { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
+			: {}),
+		...(vectorizeEnabled && vectorizeSetup.indexName
+			? {
+					WORKSHOP_VECTOR_INDEX: buildVectorizeClient({
+						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
+						apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
+						indexName: vectorizeSetup.indexName,
+					}),
+					AI: buildAiClient({
+						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
+						apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
+					}),
+				}
+			: {}),
+	} as unknown as Env
+
+	return { db, env, vectorizeSetup }
+}
+
 async function main() {
 	const environmentRaw = process.env.TARGET_ENVIRONMENT ?? 'production'
 	const parsedEnv = envSchema.parse({
@@ -773,49 +838,18 @@ async function main() {
 		environment: parsedEnv.TARGET_ENVIRONMENT,
 	})
 
-	const db = new RemoteD1Database({
-		accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
-		apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
-		databaseId: d1DatabaseId,
-	}) as unknown as D1Database
+	const { env, vectorizeSetup } = await buildWorkshopLoadEnv({
+		parsedEnv,
+		d1DatabaseId,
+		vectorizeIndexName,
+	})
 
-	const vectorizeStrict =
-		vectorizeIndexName.enabled && vectorizeIndexName.source !== 'default'
-	const vectorizeSetup = vectorizeIndexName.enabled
-		? await ensureVectorizeIndexReady({
-				accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
-				apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
-				indexName: vectorizeIndexName.indexName,
-				strict: vectorizeStrict,
-			})
-		: { enabled: false as const, indexName: undefined, created: false }
-	const vectorizeEnabled = vectorizeIndexName.enabled && vectorizeSetup.enabled
-
-	const vectorizeLabel = vectorizeEnabled
-		? `enabled (${vectorizeSetup.indexName})${vectorizeSetup.created ? ' (created)' : ''}`
-		: vectorizeIndexName.enabled
-			? `disabled (${vectorizeIndexName.indexName})`
-			: 'disabled'
-
-	const env: Env = {
-		APP_DB: db,
-		...(process.env.GITHUB_TOKEN
-			? { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
-			: {}),
-		...(vectorizeEnabled && vectorizeSetup.indexName
-			? {
-					WORKSHOP_VECTOR_INDEX: buildVectorizeClient({
-						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
-						apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
-						indexName: vectorizeSetup.indexName,
-					}),
-					AI: buildAiClient({
-						accountId: parsedEnv.CLOUDFLARE_ACCOUNT_ID,
-						apiToken: parsedEnv.CLOUDFLARE_API_TOKEN,
-					}),
-				}
-			: {}),
-	} as unknown as Env
+	const vectorizeLabel =
+		vectorizeIndexName.enabled && vectorizeSetup.enabled
+			? `enabled (${vectorizeSetup.indexName})${vectorizeSetup.created ? ' (created)' : ''}`
+			: vectorizeIndexName.enabled
+				? `disabled (${vectorizeIndexName.indexName})`
+				: 'disabled'
 
 	const startedAt = Date.now()
 	const runIds: Array<string> = []
@@ -881,8 +915,10 @@ async function main() {
 	)
 }
 
-main().catch((error) => {
-	const message = error instanceof Error ? error.message : String(error)
-	console.error(message)
-	process.exitCode = 1
-})
+if (import.meta.main) {
+	main().catch((error) => {
+		const message = error instanceof Error ? error.message : String(error)
+		console.error(message)
+		process.exitCode = 1
+	})
+}

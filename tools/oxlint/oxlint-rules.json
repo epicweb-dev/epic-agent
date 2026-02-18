@@ -1,4 +1,5 @@
 {
+	"ignorePatterns": ["**/.tmp-*/**"],
 	"jsPlugins": ["./local-plugin.js"],
 	"rules": {
 		"epic-agent-custom/no-example-identifier": "error"

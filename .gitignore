@@ -27,6 +27,7 @@ package-lock.json
 .data
 .env
 mock-data
+.tmp-*
 playwright-report
 test-results
 public/client-entry.js

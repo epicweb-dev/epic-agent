@@ -88,6 +88,10 @@ Configure these secrets for deploy workflows:
   `<wrangler.jsonc name>-workshop-vector-index-preview`)
 - `WORKSHOP_VECTORIZE_DISABLED` (optional; set to `true`/`1`/`yes` to skip
   Vectorize + Workers AI calls during CI indexing)
+- `EPICSHOP_AUTH_INFOS` (optional; base64-encoded auth JSON for headless
+  epicshop CLI; enables transcript inclusion in workshop context export; run
+  `epicshop auth login` locally, then extract and base64-encode `authInfos` from
+  your data file)
 
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 
@@ -109,10 +113,14 @@ To load workshop content into D1 + Vectorize from CI, run the
   workflow falls back to indexing all discovered workshop repositories
 - if any requested workshop slug is unknown, indexing fails fast with an
   explicit error naming missing workshops
-- the workflow runs `bun run workshop-content-load`, which:
+- the workflow runs `bun tools/workshop-content-load-from-clones.ts`, which:
+  - discovers workshop repositories via GitHub Search API
+  - clones each repository into a temporary directory
+  - runs `bunx epicshop exercises context` to export instructions, diffs, and
+    transcripts as JSON
   - reads `wrangler.jsonc` to locate the environment-specific `APP_DB` database
     id
-  - indexes workshops directly into D1 using the Cloudflare D1 API
+  - indexes workshops into D1 using the Cloudflare D1 API
   - unless `WORKSHOP_VECTORIZE_DISABLED` is set, ensures a Vectorize index
     exists (auto-creating it when missing), generates embeddings via the Workers
     AI API, and upserts vectors into Vectorize

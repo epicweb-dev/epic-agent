@@ -30,7 +30,7 @@ type GitTreeEntry = {
 	url: string
 }
 
-type RepoIndexResult = {
+export type RepoIndexResult = {
 	workshop: IndexedWorkshopWrite
 	exercises: Array<IndexedExerciseWrite>
 	steps: Array<IndexedStepWrite>
@@ -101,7 +101,7 @@ function decodeReindexCursor(cursor: string | undefined): ReindexCursor {
 	}
 }
 
-function resolveReindexRepositoryBatch({
+export function resolveReindexRepositoryBatch({
 	repositories,
 	cursor,
 	batchSize,
@@ -940,7 +940,7 @@ function filterRequestedRepositories({
 	)
 }
 
-async function listWorkshopRepositories({
+export async function listWorkshopRepositories({
 	env,
 	onlyWorkshops,
 }: {
@@ -1413,6 +1413,75 @@ async function indexWorkshopRepository({
 		steps,
 		sections,
 		sectionChunks,
+	}
+}
+
+export async function indexWorkshopFromResult({
+	env,
+	runId,
+	workshopSlug,
+	result,
+}: {
+	env: WorkshopIndexEnv
+	runId: string
+	workshopSlug: string
+	result: RepoIndexResult
+}) {
+	const db = env.APP_DB
+	const previousVectorIds = await listStoredVectorIdsForWorkshop({
+		db,
+		workshop: workshopSlug,
+	})
+	const embeddedSectionChunks = await embedChunksIfConfigured({
+		env,
+		runId,
+		workshopSlug,
+		sectionChunks: result.sectionChunks,
+	})
+	const insertedVectorIds = collectVectorIds(embeddedSectionChunks)
+	try {
+		await replaceWorkshopIndex({
+			db,
+			runId,
+			workshop: result.workshop,
+			exercises: result.exercises,
+			steps: result.steps,
+			sections: result.sections,
+			sectionChunks: embeddedSectionChunks,
+		})
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		const rollbackVectorCount = await deleteVectorIdsIfConfigured({
+			env,
+			runId,
+			workshopSlug,
+			vectorIds: insertedVectorIds,
+		})
+		console.warn(
+			'workshop-reindex-repository-rollback',
+			JSON.stringify({
+				runId,
+				workshopSlug,
+				insertedVectorCount: insertedVectorIds.length,
+				rollbackVectorCount,
+				error: message,
+			}),
+		)
+		throw error
+	}
+	const deletedVectorCount = await deleteVectorIdsIfConfigured({
+		env,
+		runId,
+		workshopSlug,
+		vectorIds: previousVectorIds,
+	})
+	return {
+		insertedVectorCount: insertedVectorIds.length,
+		deletedVectorCount,
+		exerciseCount: result.exercises.length,
+		stepCount: result.steps.length,
+		sectionCount: result.sections.length,
+		sectionChunkCount: embeddedSectionChunks.length,
 	}
 }
 

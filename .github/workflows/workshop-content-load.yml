@@ -58,4 +58,5 @@ jobs:
             ${{ secrets.WORKSHOP_VECTORIZE_INDEX_NAME }}
           WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW:
             ${{ secrets.WORKSHOP_VECTORIZE_INDEX_NAME_PREVIEW }}
-        run: bun run --silent workshop-content-load
+          EPICSHOP_AUTH_INFOS: ${{ secrets.EPICSHOP_AUTH_INFOS }}
+        run: bun tools/workshop-content-load-from-clones.ts
