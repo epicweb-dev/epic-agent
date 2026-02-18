@@ -1,3 +1,4 @@
+import { getAgentByName } from 'agents'
 import {
 	readAuthSession,
 	setAuthSessionSecret,
@@ -38,6 +39,6 @@ export async function handleChatTurnRequest({
 
 	// Route to a stable chat agent instance per signed-in user, so we can keep
 	// MCP session state across turns without needing the browser to manage it.
-	const chatAgentId = env.CHAT_AGENT.idFromName(session.id)
-	return env.CHAT_AGENT.get(chatAgentId).fetch(request)
+	const chatAgent = await getAgentByName(env.CHAT_AGENT, session.id)
+	return chatAgent.fetch(request)
 }
