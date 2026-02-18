@@ -28,19 +28,18 @@ function buildErrorResult({
 	next?: Array<string>
 }) {
 	const nextSteps = next?.filter(Boolean) ?? []
+	const nextSection =
+		nextSteps.length > 0 ? `\n\nNext:\n${formatBullets(nextSteps)}` : ''
 	return {
 		isError: true,
 		content: [
 			{
 				type: 'text' as const,
-				text: [
-					`## ❌ ${title}`,
-					'',
-					message.trim(),
-					...(nextSteps.length > 0
-						? ['', 'Next:', ...nextSteps.map((step) => `- ${step}`)]
-						: []),
-				].join('\n'),
+				text: `
+## ❌ ${title}
+
+${message.trim()}${nextSection}
+				`.trim(),
 			},
 		],
 	}
@@ -71,6 +70,17 @@ function formatOptionalCursor(cursor: string | undefined) {
 
 function formatOptionalStep(stepNumber: number | undefined) {
 	return typeof stepNumber === 'number' ? String(stepNumber) : '_all steps_'
+}
+
+function joinLines(lines: Array<string>) {
+	return lines.reduce(
+		(acc, line) => (acc.length > 0 ? `${acc}\n${line}` : line),
+		'',
+	)
+}
+
+function formatBullets(items: Array<string>) {
+	return joinLines(items.map((item) => `- ${item}`))
 }
 
 function formatSectionsMarkdown(
@@ -111,7 +121,7 @@ function formatDiffSectionsMarkdown(
 			const heading = `### ${index + 1}) ${section.label}\n_kind_: \`${section.kind}\`${source}`
 			const body = section.content.trim()
 			const fencedBody =
-				body.length > 0 ? ['```diff', body, '```'].join('\n') : '_Empty diff._'
+				body.length > 0 ? `\`\`\`diff\n${body}\n\`\`\`` : '_Empty diff._'
 			return `${heading}\n\n${fencedBody}`
 		})
 		.join('\n\n---\n\n')
@@ -170,37 +180,35 @@ export async function registerTools(agent: MCP) {
 						nextSteps.push('No nextCursor returned; this is the last page.')
 					}
 				}
+				const workshopLines = joinLines(
+					preview.map((workshop) => {
+						const product = workshop.product ? ` (${workshop.product})` : ''
+						return `- \`${workshop.workshop}\` — ${workshop.title}${product} • exercises: ${workshop.exerciseCount} • diffs: ${workshop.hasDiffs ? 'yes' : 'no'} • lastIndexedAt: ${workshop.lastIndexedAt}`
+					}),
+				)
+				const moreLine =
+					workshops.length > preview.length
+						? `\n\n_…and ${workshops.length - preview.length} more. See the structured output for the full list._`
+						: ''
+				const nextSection =
+					nextSteps.length > 0 ? `\n\nNext:\n${formatBullets(nextSteps)}` : ''
 				return {
 					content: [
 						{
 							type: 'text',
-							text: [
-								'## ✅ Indexed workshops',
-								'',
-								`Returned: **${workshops.length}**`,
-								`Next cursor: ${formatOptionalCursor(result.nextCursor)}`,
-								'',
-								'Filters:',
-								`- ${filters}`,
-								'',
-								`Showing: **${preview.length}** of **${workshops.length}** workshop(s)`,
-								'',
-								...preview.map((workshop) => {
-									const product = workshop.product
-										? ` (${workshop.product})`
-										: ''
-									return `- \`${workshop.workshop}\` — ${workshop.title}${product} • exercises: ${workshop.exerciseCount} • diffs: ${workshop.hasDiffs ? 'yes' : 'no'} • lastIndexedAt: ${workshop.lastIndexedAt}`
-								}),
-								...(workshops.length > preview.length
-									? [
-											'',
-											`_…and ${workshops.length - preview.length} more. See the structured output for the full list._`,
-										]
-									: []),
-								...(nextSteps.length > 0
-									? ['', 'Next:', ...nextSteps.map((step) => `- ${step}`)]
-									: []),
-							].join('\n'),
+							text: `
+## ✅ Indexed workshops
+
+Returned: **${workshops.length}**
+Next cursor: ${formatOptionalCursor(result.nextCursor)}
+
+Filters:
+- ${filters}
+
+Showing: **${preview.length}** of **${workshops.length}** workshop(s)
+
+${workshopLines}${moreLine}${nextSection}
+							`.trim(),
 						},
 					],
 					structuredContent: result,
@@ -253,34 +261,31 @@ export async function registerTools(agent: MCP) {
 						`Call \`retrieve_learning_context\` again with { workshop: "${result.workshop}", exerciseNumber: ${result.exerciseNumber}${stepNumberPart}, cursor: nextCursor }.`,
 					)
 				}
+				const continuationSection =
+					continuationSteps.length > 0
+						? `\n\nNext:\n${formatBullets(continuationSteps)}`
+						: ''
 				return {
 					content: [
 						{
 							type: 'text',
-							text: [
-								'## ✅ Learning context',
-								'',
-								'Scope:',
-								`- workshop: \`${result.workshop}\``,
-								`- exerciseNumber: ${result.exerciseNumber}`,
-								`- stepNumber: ${formatOptionalStep(result.stepNumber)}`,
-								`- random: ${args.data.random === true ? '`true`' : '`false`'}`,
-								'',
-								'Payload:',
-								`- maxChars (requested): ${maxCharsLabel}`,
-								`- truncated: \`${String(result.truncated)}\``,
-								`- nextCursor: ${formatOptionalCursor(result.nextCursor)}`,
-								`- sections: **${result.sections.length}**`,
-								'',
-								formatSectionsMarkdown(result.sections),
-								...(continuationSteps.length > 0
-									? [
-											'',
-											'Next:',
-											...continuationSteps.map((step) => `- ${step}`),
-										]
-									: []),
-							].join('\n'),
+							text: `
+## ✅ Learning context
+
+Scope:
+- workshop: \`${result.workshop}\`
+- exerciseNumber: ${result.exerciseNumber}
+- stepNumber: ${formatOptionalStep(result.stepNumber)}
+- random: ${args.data.random === true ? '`true`' : '`false`'}
+
+Payload:
+- maxChars (requested): ${maxCharsLabel}
+- truncated: \`${String(result.truncated)}\`
+- nextCursor: ${formatOptionalCursor(result.nextCursor)}
+- sections: **${result.sections.length}**
+
+${formatSectionsMarkdown(result.sections)}${continuationSection}
+							`.trim(),
 						},
 					],
 					structuredContent: result,
@@ -349,34 +354,31 @@ export async function registerTools(agent: MCP) {
 						`Call \`retrieve_diff_context\` again with { workshop: "${result.workshop}", exerciseNumber: ${result.exerciseNumber}${stepNumberPart}${focusPart}, cursor: nextCursor }.`,
 					)
 				}
+				const diffContinuationSection =
+					diffContinuationSteps.length > 0
+						? `\n\nNext:\n${formatBullets(diffContinuationSteps)}`
+						: ''
 				return {
 					content: [
 						{
 							type: 'text',
-							text: [
-								'## ✅ Diff context',
-								'',
-								'Scope:',
-								`- workshop: \`${result.workshop}\``,
-								`- exerciseNumber: ${result.exerciseNumber}`,
-								`- stepNumber: ${formatOptionalStep(result.stepNumber)}`,
-								`- focus: ${focusLabel}`,
-								'',
-								'Payload:',
-								`- maxChars (requested): ${maxCharsLabel}`,
-								`- truncated: \`${String(result.truncated)}\``,
-								`- nextCursor: ${formatOptionalCursor(result.nextCursor)}`,
-								`- diffSections: **${result.diffSections.length}**`,
-								'',
-								formatDiffSectionsMarkdown(result.diffSections),
-								...(diffContinuationSteps.length > 0
-									? [
-											'',
-											'Next:',
-											...diffContinuationSteps.map((step) => `- ${step}`),
-										]
-									: []),
-							].join('\n'),
+							text: `
+## ✅ Diff context
+
+Scope:
+- workshop: \`${result.workshop}\`
+- exerciseNumber: ${result.exerciseNumber}
+- stepNumber: ${formatOptionalStep(result.stepNumber)}
+- focus: ${focusLabel}
+
+Payload:
+- maxChars (requested): ${maxCharsLabel}
+- truncated: \`${String(result.truncated)}\`
+- nextCursor: ${formatOptionalCursor(result.nextCursor)}
+- diffSections: **${result.diffSections.length}**
+
+${formatDiffSectionsMarkdown(result.diffSections)}${diffContinuationSection}
+							`.trim(),
 						},
 					],
 					structuredContent: result,
@@ -429,59 +431,50 @@ export async function registerTools(agent: MCP) {
 						'Pick a match and retrieve full context with retrieve_learning_context or retrieve_diff_context using its workshop/exercise/step scope.',
 					)
 				}
+				const warningsSection =
+					warnings.length > 0
+						? `\n\n### ⚠️ Warnings\n${formatBullets(warnings)}`
+						: ''
+				const matchesSection =
+					result.matches.length > 0
+						? `\n\n### Matches\n${joinLines(
+								result.matches.map((match, index) => {
+									const scopeParts: Array<string> = [`\`${match.workshop}\``]
+									if (typeof match.exerciseNumber === 'number') {
+										scopeParts.push(`exercise ${match.exerciseNumber}`)
+									}
+									if (typeof match.stepNumber === 'number') {
+										scopeParts.push(`step ${match.stepNumber}`)
+									}
+									const scopeLabel = scopeParts.join(' ')
+									const source = match.sourcePath
+										? `\n_Source_: \`${match.sourcePath}\``
+										: ''
+									return `
+#### ${index + 1}) ${scopeLabel} — score: ${match.score.toFixed(3)}
+_vectorId_: \`${match.vectorId}\`${source}
+
+${match.chunk.trim()}
+									`.trim()
+								}),
+							)}`
+						: `\n\n_No matches returned._`
+				const searchNextSection =
+					searchNextSteps.length > 0
+						? `\n\nNext:\n${formatBullets(searchNextSteps)}`
+						: ''
 				return {
 					content: [
 						{
 							type: 'text',
-							text: [
-								'## ✅ Topic search',
-								'',
-								`**Query**: \`${result.query}\``,
-								`**Mode**: \`${result.mode}\``,
-								`**Vector search available**: \`${String(
-									result.vectorSearchAvailable,
-								)}\``,
-								`**Matches**: **${result.matches.length}** (limit: ${result.limit})`,
-								...(warnings.length > 0
-									? [
-											'',
-											'### ⚠️ Warnings',
-											...warnings.map((warning) => `- ${warning}`),
-										]
-									: []),
-								...(result.matches.length > 0
-									? [
-											'',
-											'### Matches',
-											...result.matches.map((match, index) => {
-												const scopeParts: Array<string> = [
-													`\`${match.workshop}\``,
-												]
-												if (typeof match.exerciseNumber === 'number') {
-													scopeParts.push(`exercise ${match.exerciseNumber}`)
-												}
-												if (typeof match.stepNumber === 'number') {
-													scopeParts.push(`step ${match.stepNumber}`)
-												}
-												const scopeLabel = scopeParts.join(' ')
-												const source = match.sourcePath
-													? `\n_Source_: \`${match.sourcePath}\``
-													: ''
-												return [
-													`#### ${index + 1}) ${scopeLabel} — score: ${match.score.toFixed(
-														3,
-													)}`,
-													`_vectorId_: \`${match.vectorId}\`${source}`,
-													'',
-													match.chunk.trim(),
-												].join('\n')
-											}),
-										]
-									: ['', '_No matches returned._']),
-								...(searchNextSteps.length > 0
-									? ['', 'Next:', ...searchNextSteps.map((step) => `- ${step}`)]
-									: []),
-							].join('\n'),
+							text: `
+## ✅ Topic search
+
+**Query**: \`${result.query}\`
+**Mode**: \`${result.mode}\`
+**Vector search available**: \`${String(result.vectorSearchAvailable)}\`
+**Matches**: **${result.matches.length}** (limit: ${result.limit})${warningsSection}${matchesSection}${searchNextSection}
+							`.trim(),
 						},
 					],
 					structuredContent: result,
@@ -524,23 +517,19 @@ export async function registerTools(agent: MCP) {
 					content: [
 						{
 							type: 'text',
-							text: [
-								`## ✅ Quiz protocol`,
-								'',
-								`topic: ${result.topic ? `\`${result.topic}\`` : '_ask the learner_'}`,
-								`learnerGoal: ${
-									result.learnerGoal
-										? `\`${result.learnerGoal}\``
-										: '_unspecified_'
-								}`,
-								`targetQuestionCount: \`${String(result.targetQuestionCount)}\``,
-								'',
-								result.instructionsMarkdown,
-								'',
-								'Next:',
-								'- Use retrieve_learning_context or search_topic_context to gather source material.',
-								'- Ask one question at a time and follow the protocol.',
-							].join('\n'),
+							text: `
+## ✅ Quiz protocol
+
+topic: ${result.topic ? `\`${result.topic}\`` : '_ask the learner_'}
+learnerGoal: ${result.learnerGoal ? `\`${result.learnerGoal}\`` : '_unspecified_'}
+targetQuestionCount: \`${String(result.targetQuestionCount)}\`
+
+${result.instructionsMarkdown}
+
+Next:
+- Use retrieve_learning_context or search_topic_context to gather source material.
+- Ask one question at a time and follow the protocol.
+							`.trim(),
 						},
 					],
 					structuredContent: result,
