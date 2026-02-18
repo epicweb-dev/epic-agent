@@ -26,8 +26,23 @@ type MockSectionRow = {
 	is_diff?: number
 }
 
+type MockChunkRow = {
+	id: number
+	workshop_slug: string
+	exercise_number?: number | null
+	step_number?: number | null
+	section_kind?: string | null
+	label?: string | null
+	source_path?: string | null
+	vector_id?: string | null
+	content: string
+	char_count?: number
+	match_pos?: number
+}
+
 function createMockDb({
 	rowsByVectorId,
+	chunkRows = [],
 	sectionRows = [],
 	workshops = [],
 	workshopExercises = {},
@@ -47,6 +62,7 @@ function createMockDb({
 			source_path?: string | null
 		}
 	>
+	chunkRows?: Array<MockChunkRow>
 	sectionRows?: Array<MockSectionRow>
 	workshops?: Array<string>
 	workshopExercises?: Record<string, Array<number>>
@@ -129,6 +145,188 @@ function createMockDb({
 						},
 					}
 				}
+				if (
+					query.includes('FROM indexed_section_chunks') &&
+					query.includes('instr(lower(c.content)')
+				) {
+					return {
+						bind(...rawArgs: Array<unknown>) {
+							return {
+								async all() {
+									const args = rawArgs.slice()
+									const loweredQuery = String(args.shift() ?? '').toLowerCase()
+									const limit = Number(args.pop() ?? 0)
+									let workshop: string | undefined
+									let exerciseNumber: number | undefined
+									let stepNumber: number | undefined
+									for (const arg of args) {
+										if (typeof arg === 'string' && workshop === undefined) {
+											workshop = arg
+											continue
+										}
+										if (
+											typeof arg === 'number' &&
+											exerciseNumber === undefined
+										) {
+											exerciseNumber = arg
+											continue
+										}
+										if (typeof arg === 'number' && stepNumber === undefined) {
+											stepNumber = arg
+											continue
+										}
+									}
+									const filtered = chunkRows
+										.map((row) => {
+											const contentLower = (row.content ?? '').toLowerCase()
+											const index = loweredQuery
+												? contentLower.indexOf(loweredQuery)
+												: -1
+											return {
+												...row,
+												match_pos: index >= 0 ? index + 1 : 0,
+											}
+										})
+										.filter((row) => {
+											if (row.match_pos <= 0) return false
+											if (workshop && row.workshop_slug !== workshop)
+												return false
+											if (
+												typeof exerciseNumber === 'number' &&
+												row.exercise_number !== exerciseNumber
+											) {
+												return false
+											}
+											if (
+												typeof stepNumber === 'number' &&
+												row.step_number !== stepNumber
+											) {
+												return false
+											}
+											return true
+										})
+										.sort((left, right) => {
+											const leftPos = left.match_pos ?? 0
+											const rightPos = right.match_pos ?? 0
+											if (leftPos !== rightPos) return leftPos - rightPos
+											const leftChars = left.char_count ?? left.content.length
+											const rightChars =
+												right.char_count ?? right.content.length
+											if (leftChars !== rightChars)
+												return rightChars - leftChars
+											return left.id - right.id
+										})
+									const limited =
+										Number.isFinite(limit) && limit > 0
+											? filtered.slice(0, Math.floor(limit))
+											: filtered
+									return {
+										results: limited.map((row) => ({
+											chunk_id: row.id,
+											vector_id: row.vector_id ?? null,
+											chunk_content: row.content,
+											workshop_slug: row.workshop_slug,
+											exercise_number: row.exercise_number ?? null,
+											step_number: row.step_number ?? null,
+											section_kind: row.section_kind ?? null,
+											label: row.label ?? null,
+											source_path: row.source_path ?? null,
+											match_pos: row.match_pos ?? 0,
+										})),
+									}
+								},
+							}
+						},
+					}
+				}
+				if (
+					query.includes('FROM indexed_sections') &&
+					query.includes('instr(lower(content)')
+				) {
+					return {
+						bind(...rawArgs: Array<unknown>) {
+							return {
+								async all() {
+									const args = rawArgs.slice()
+									const loweredQuery = String(args.shift() ?? '').toLowerCase()
+									const limit = Number(args.pop() ?? 0)
+									let workshop: string | undefined
+									let exerciseNumber: number | undefined
+									let stepNumber: number | undefined
+									for (const arg of args) {
+										if (typeof arg === 'string' && workshop === undefined) {
+											workshop = arg
+											continue
+										}
+										if (
+											typeof arg === 'number' &&
+											exerciseNumber === undefined
+										) {
+											exerciseNumber = arg
+											continue
+										}
+										if (typeof arg === 'number' && stepNumber === undefined) {
+											stepNumber = arg
+											continue
+										}
+									}
+									const filtered = sectionRows
+										.map((row, index) => {
+											const contentLower = (row.content ?? '').toLowerCase()
+											const matchIndex = loweredQuery
+												? contentLower.indexOf(loweredQuery)
+												: -1
+											return {
+												...row,
+												section_id: index + 1,
+												match_pos: matchIndex >= 0 ? matchIndex + 1 : 0,
+											}
+										})
+										.filter((row) => {
+											if (row.match_pos <= 0) return false
+											if (workshop && row.workshop_slug !== workshop)
+												return false
+											if (
+												typeof exerciseNumber === 'number' &&
+												row.exercise_number !== exerciseNumber
+											) {
+												return false
+											}
+											if (
+												typeof stepNumber === 'number' &&
+												row.step_number !== stepNumber
+											) {
+												return false
+											}
+											return true
+										})
+										.sort((left, right) => {
+											if (left.match_pos !== right.match_pos)
+												return (left.match_pos ?? 0) - (right.match_pos ?? 0)
+											return right.content.length - left.content.length
+										})
+									const limited =
+										Number.isFinite(limit) && limit > 0
+											? filtered.slice(0, Math.floor(limit))
+											: filtered
+									return {
+										results: limited.map((row) => ({
+											section_id: row.section_id,
+											workshop_slug: row.workshop_slug,
+											exercise_number: row.exercise_number ?? null,
+											step_number: row.step_number ?? null,
+											section_kind: row.section_kind,
+											label: row.label,
+											source_path: row.source_path ?? null,
+											content: row.content,
+											match_pos: row.match_pos ?? 0,
+										})),
+									}
+								},
+							}
+						},
+					}
+				}
 				if (query.includes('FROM indexed_sections')) {
 					return {
 						bind(...scopeArgs: Array<string | number>) {
@@ -198,20 +396,37 @@ function createMockDb({
 	}
 }
 
-test('searchTopicContext throws clear error without bindings', async () => {
-	const { db } = createMockDb({ rowsByVectorId: {} })
+test('searchTopicContext falls back to keyword search without vector bindings', async () => {
+	const { db } = createMockDb({
+		rowsByVectorId: {},
+		chunkRows: [
+			{
+				id: 1,
+				workshop_slug: 'mcp-fundamentals',
+				exercise_number: 1,
+				step_number: 1,
+				section_kind: 'problem-instructions',
+				label: 'Problem instructions',
+				source_path: 'exercises/01/README.mdx',
+				content: 'MCP intro and architecture details live here.',
+				char_count: 44,
+			},
+		],
+	})
 	const env = {
 		APP_DB: db,
 	} as unknown as Env
 
-	await expect(
-		searchTopicContext({
-			env,
-			query: 'model context protocol',
-		}),
-	).rejects.toThrow(
-		'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
-	)
+	const result = await searchTopicContext({
+		env,
+		query: 'architecture',
+	})
+
+	expect(result.mode).toBe('keyword')
+	expect(result.vectorSearchAvailable).toBe(false)
+	expect(result.keywordSource).toBe('chunks')
+	expect(result.warnings?.join('\n')).toContain('Falling back to basic keyword')
+	expect(result.matches.length).toBe(1)
 })
 
 test('retrieveWorkshopList clamps limit to shared max', async () => {

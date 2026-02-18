@@ -69,11 +69,15 @@ the requested scope (workshop/exercise and step when provided).
 
 Semantic search over vectorized chunk content.
 
-Requirements:
+Behavior and requirements:
 
-- `WORKSHOP_VECTOR_INDEX` binding
-- `AI` binding for embeddings
 - `query` must be at least 3 non-whitespace characters
+- When `WORKSHOP_VECTOR_INDEX` + `AI` bindings are configured, the tool performs
+  semantic (vector) search.
+- When either binding is missing, the tool falls back to a case-insensitive
+  keyword search over indexed D1 content (so callers still get useful results).
+  The response includes `mode`, `vectorSearchAvailable`, and `warnings` so
+  callers can detect the fallback.
 
 Behavior:
 
@@ -87,7 +91,13 @@ Behavior:
 - includes `sourcePath` in ranked matches when section provenance is available
 - trims and dedupes matched vector IDs before returning ranked matches
 
-If bindings are missing, the tool returns an explicit unavailability error.
+Enabling semantic search:
+
+- Create a Vectorize index with `dimensions: 768` and `metric: cosine`.
+- Bind it in `wrangler.jsonc` as `WORKSHOP_VECTOR_INDEX` via the `vectorize`
+  config, and add an `ai` binding named `AI`.
+- Re-run workshop indexing to populate vectors (GitHub Actions
+  `🧠 Load Workshop Content` or `POST /internal/workshop-index/reindex`).
 
 ## Manual indexing trigger
 

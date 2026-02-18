@@ -36,6 +36,35 @@ Quick notes for getting a local epic-agent environment running.
 - Set `CLOUDFLARE_ENV` to switch Wrangler environments (defaults to
   `production`). Playwright sets this to `test`.
 
+## Optional: semantic topic search (Vectorize + Workers AI)
+
+`search_topic_context` works without Vectorize/AI (keyword fallback), but you
+can enable semantic search in environments where you have Cloudflare Vectorize
+and Workers AI available.
+
+1. Create a Vectorize index with `dimensions: 768` and `metric: cosine`.
+2. Add bindings in `wrangler.jsonc` for the target environment (`production` or
+   `preview`):
+
+```jsonc
+{
+	"env": {
+		"production": {
+			"ai": { "binding": "AI" },
+			"vectorize": [
+				{
+					"binding": "WORKSHOP_VECTOR_INDEX",
+					"index_name": "epic-agent-workshop-vector-index",
+				},
+			],
+		},
+	},
+}
+```
+
+3. Re-run workshop indexing to upsert vectors (GitHub Actions
+   `🧠 Load Workshop Content` or `POST /internal/workshop-index/reindex`).
+
 ## Checks
 
 - `bun run validate` runs format check, lint fix, build, typecheck, Playwright
