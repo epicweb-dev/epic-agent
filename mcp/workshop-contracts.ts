@@ -127,7 +127,8 @@ const searchTopicContextInputShape = {
 	query: z
 		.string()
 		.trim()
-		.min(3, 'query must be at least 3 characters for topic search.'),
+		.min(3, 'query must be at least 3 characters for topic search.')
+		.describe('Topic search query (min 3 characters).'),
 	limit: z.coerce
 		.number()
 		.int()

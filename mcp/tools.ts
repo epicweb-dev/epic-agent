@@ -436,7 +436,7 @@ export async function registerTools(agent: MCP) {
 					next.push('Broaden or omit `focus` to retrieve more diff context.')
 				}
 				return buildErrorResult({
-					message,
+					message: `Unable to retrieve diff context: ${message}`,
 					next: next.length > 0 ? next : undefined,
 				})
 			}
@@ -500,7 +500,7 @@ export async function registerTools(agent: MCP) {
 					next.push('Call `list_workshops` to see available workshop slugs.')
 				}
 				return buildErrorResult({
-					message,
+					message: `Unable to search topic context: ${message}`,
 					next: next.length > 0 ? next : undefined,
 				})
 			}
