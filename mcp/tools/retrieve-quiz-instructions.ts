@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
-import { readOnlyToolAnnotations } from '../server-metadata.ts'
 import {
 	buildQuizInstructionsResult,
 	retrieveQuizInstructionsInputSchema,
@@ -8,7 +7,8 @@ import {
 import {
 	buildErrorResult,
 	buildInputValidationErrorResult,
-} from '../tool-helpers.ts'
+	readOnlyToolAnnotations,
+} from '../mcp-utils.ts'
 
 const name = 'retrieve_quiz_instructions' as const
 

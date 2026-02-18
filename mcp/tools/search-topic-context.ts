@@ -1,14 +1,14 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
-import { openWorldReadOnlyToolAnnotations } from '../server-metadata.ts'
 import { searchTopicContextInputSchema } from '../workshop-contracts.ts'
 import { searchTopicContext } from '../workshop-retrieval.ts'
 import {
 	buildErrorResult,
 	buildInputValidationErrorResult,
+	openWorldReadOnlyToolAnnotations,
 	formatBullets,
 	joinLines,
-} from '../tool-helpers.ts'
+} from '../mcp-utils.ts'
 
 const name = 'search_topic_context' as const
 

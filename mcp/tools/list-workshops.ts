@@ -1,15 +1,15 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
-import { readOnlyToolAnnotations } from '../server-metadata.ts'
 import { listWorkshopsInputSchema } from '../workshop-contracts.ts'
 import { retrieveWorkshopList } from '../workshop-retrieval.ts'
 import {
 	buildErrorResult,
 	buildInputValidationErrorResult,
+	readOnlyToolAnnotations,
 	formatBullets,
 	formatOptionalCursor,
 	joinLines,
-} from '../tool-helpers.ts'
+} from '../mcp-utils.ts'
 
 const name = 'list_workshops' as const
 

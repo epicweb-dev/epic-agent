@@ -1,4 +1,5 @@
-import { type z } from 'zod'
+import { z } from 'zod'
+import { type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
 
 export type MarkdownSection = {
 	label: string
@@ -6,6 +7,32 @@ export type MarkdownSection = {
 	content: string
 	sourcePath?: string
 }
+
+export const readOnlyToolAnnotations = {
+	readOnlyHint: true,
+	destructiveHint: false,
+	idempotentHint: true,
+	openWorldHint: false,
+} satisfies ToolAnnotations
+
+export const nonDeterministicReadOnlyToolAnnotations = {
+	...readOnlyToolAnnotations,
+	idempotentHint: false,
+} satisfies ToolAnnotations
+
+export const openWorldReadOnlyToolAnnotations = {
+	...readOnlyToolAnnotations,
+	openWorldHint: true,
+} satisfies ToolAnnotations
+
+export const retrievalSectionOutputSchema = z.object({
+	label: z.string(),
+	kind: z.string(),
+	content: z.string(),
+	sourcePath: z.string().optional(),
+	exerciseNumber: z.number().int().positive().optional(),
+	stepNumber: z.number().int().positive().optional(),
+})
 
 export function joinLines(lines: Array<string>) {
 	return lines.join('\n')
