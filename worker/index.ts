@@ -15,6 +15,7 @@ import {
 	isProtectedResourceMetadataRequest,
 	mcpResourcePath,
 } from './mcp-auth.ts'
+import { chatTurnPath, handleChatTurnRequest } from './chat-api.ts'
 import { withCors } from './utils.ts'
 
 export { MCP }
@@ -66,6 +67,10 @@ const appHandler = withCors({
 					binding: 'MCP_OBJECT',
 				}).fetch,
 			})
+		}
+
+		if (url.pathname === chatTurnPath) {
+			return handleChatTurnRequest({ request, env, ctx })
 		}
 
 		// Indexing is intentionally not available from the app runtime. Workshop
