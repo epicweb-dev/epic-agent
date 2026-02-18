@@ -19,16 +19,9 @@ Quick notes for getting a local epic-agent environment running.
   deployments when syncing Cloudflare Worker secrets.
 - `bun run dev` (starts mock API servers automatically and sets
   `RESEND_API_BASE_URL` to the local mock host).
-- To trigger workshop indexing manually in local/dev environments:
-  - set `WORKSHOP_INDEX_ADMIN_TOKEN` in `.env`
-  - call `POST /internal/workshop-index/reindex` with
-    `Authorization: Bearer <token>` (bearer scheme is case-insensitive)
-  - optional `workshops` payload can be an array or comma/newline-delimited
-    string; values are normalized to lowercase slugs
-  - optional batching fields:
-    - `batchSize` (1-20) to process workshops in smaller requests
-    - `cursor` for continuation, using the `nextCursor` returned by the prior
-      response
+- Workshop indexing runs via the GitHub Actions workflow "Load Workshop Content"
+  (it writes to D1 and Vectorize from CI). The app runtime does not expose a
+  reindex endpoint.
 - Add new mock API servers by following `docs/agents/mock-api-servers.md`.
 - If you only need the client bundle or worker, use:
   - `bun run dev:client`
@@ -62,8 +55,8 @@ and Workers AI available.
 }
 ```
 
-3. Re-run workshop indexing to upsert vectors (GitHub Actions
-   `🧠 Load Workshop Content` or `POST /internal/workshop-index/reindex`).
+3. Re-run workshop indexing to upsert vectors (GitHub Actions workflow "Load
+   Workshop Content").
 
 ## Checks
 
@@ -74,12 +67,6 @@ and Workers AI available.
 - `bun run test:mcp:unit` to run MCP retrieval/indexing unit tests and route
   tests.
 - `bun run test:mcp` to run MCP server E2E tests.
-- `bun run test:mcp:network` to include network-dependent manual reindex MCP E2E
-  coverage (skipped by default in `test:mcp` to avoid flaky/rate-limit failures
-  and unnecessary cost). This command uses `GITHUB_TOKEN`/`GH_TOKEN` when set,
-  and otherwise attempts to reuse `gh auth token` locally when available. If
-  neither credential source is available, the manual reindex network case is
-  skipped.
 
 ## Remote Cloudflare commands with API tokens
 

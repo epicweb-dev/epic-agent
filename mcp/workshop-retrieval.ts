@@ -730,7 +730,7 @@ function buildVectorSearchSetupHint() {
 		'To enable semantic topic search (Vectorize + Workers AI):',
 		'- Create a Vectorize index (dimensions: 768, metric: cosine).',
 		'- Add Wrangler bindings: `ai` binding "AI" and `vectorize` binding "WORKSHOP_VECTOR_INDEX" pointing at the index name.',
-		'- Re-run workshop indexing to upsert vectors (GitHub Actions "🧠 Load Workshop Content" or POST /internal/workshop-index/reindex).',
+		'- Re-run workshop indexing to upsert vectors (GitHub Actions workflow "Load Workshop Content").',
 	].join('\n')
 }
 

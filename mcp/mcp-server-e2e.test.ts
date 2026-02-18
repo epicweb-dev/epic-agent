@@ -18,18 +18,11 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { workshopIndexRequestBodyMaxChars } from '../shared/workshop-index-constants.ts'
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url))
 const migrationsDir = join(projectRoot, 'migrations')
 const bunBin = process.execPath
 const defaultTimeoutMs = 60_000
-const indexingTimeoutMs = 240_000
-const testWorkshopIndexAdminToken = 'test-workshop-index-token'
-const runWorkshopNetworkTests = process.env.RUN_WORKSHOP_NETWORK_TESTS === '1'
-const runtimeGitHubToken = resolveRuntimeGitHubToken()
-const runWorkshopNetworkReindexTest =
-	runWorkshopNetworkTests && Boolean(runtimeGitHubToken)
 
 const passwordHashPrefix = 'pbkdf2_sha256'
 const passwordSaltBytes = 16
@@ -38,28 +31,6 @@ const passwordHashIterations = 100_000
 
 function delay(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function resolveRuntimeGitHubToken() {
-	const configuredToken =
-		process.env.GITHUB_TOKEN?.trim() ?? process.env.GH_TOKEN?.trim()
-	if (configuredToken) return configuredToken
-	if (!runWorkshopNetworkTests) return undefined
-	if (!Bun.which('gh')) return undefined
-
-	try {
-		const tokenLookup = Bun.spawnSync({
-			cmd: ['gh', 'auth', 'token'],
-			cwd: projectRoot,
-			stdout: 'pipe',
-			stderr: 'pipe',
-		})
-		if (tokenLookup.exitCode !== 0) return undefined
-		const token = tokenLookup.stdout.toString().trim()
-		return token.length > 0 ? token : undefined
-	} catch {
-		return undefined
-	}
 }
 
 function toHex(bytes: Uint8Array) {
@@ -583,7 +554,6 @@ async function stopProcess(proc: ReturnType<typeof Bun.spawn>) {
 async function startDevServer(persistDir: string) {
 	const port = await getPort({ host: '127.0.0.1' })
 	const origin = `http://127.0.0.1:${port}`
-	const wranglerLogLevel = runWorkshopNetworkTests ? 'info' : 'error'
 	const devCommand: Array<string> = [
 		bunBin,
 		'x',
@@ -602,11 +572,8 @@ async function startDevServer(persistDir: string) {
 		persistDir,
 		'--show-interactive-dev-session=false',
 		'--log-level',
-		wranglerLogLevel,
+		'error',
 	]
-	if (runtimeGitHubToken) {
-		devCommand.push('--var', `GITHUB_TOKEN:${runtimeGitHubToken}`)
-	}
 	const proc = Bun.spawn({
 		cmd: devCommand,
 		cwd: projectRoot,
@@ -1048,40 +1015,7 @@ test(
 )
 
 test(
-	'manual reindex endpoint rejects malformed json payloads',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: '{"workshops":["mcp-fundamentals"]',
-			},
-		)
-
-		expect(response.status).toBe(400)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-			details?: Array<string>
-		}
-		expect(payload).toEqual({
-			ok: false,
-			error: 'Invalid reindex payload.',
-			details: ['Request body must be valid JSON.'],
-		})
-	},
-	{ timeout: defaultTimeoutMs },
-)
-
-test(
-	'manual reindex endpoint rejects missing bearer tokens',
+	'manual reindex endpoint is not available',
 	async () => {
 		await using database = await createTestDatabase()
 		await using server = await startDevServer(database.persistDir)
@@ -1097,269 +1031,17 @@ test(
 			},
 		)
 
-		expect(response.status).toBe(401)
+		expect(response.status).toBe(404)
 		const payload = (await response.json()) as {
 			ok: boolean
 			error: string
 		}
 		expect(payload).toEqual({
 			ok: false,
-			error: 'Unauthorized',
+			error: 'Not Found',
 		})
 	},
 	{ timeout: defaultTimeoutMs },
-)
-
-test(
-	'manual reindex endpoint rejects invalid bearer tokens',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: 'Bearer not-the-right-token',
-					'Content-Type': 'application/json',
-				},
-				body: '{}',
-			},
-		)
-
-		expect(response.status).toBe(401)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-		}
-		expect(payload).toEqual({
-			ok: false,
-			error: 'Unauthorized',
-		})
-	},
-	{ timeout: defaultTimeoutMs },
-)
-
-test(
-	'manual reindex endpoint accepts lowercase bearer authorization scheme',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: '{"workshops":["mcp-fundamentals"]',
-			},
-		)
-
-		expect(response.status).toBe(400)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-			details?: Array<string>
-		}
-		expect(payload).toEqual({
-			ok: false,
-			error: 'Invalid reindex payload.',
-			details: ['Request body must be valid JSON.'],
-		})
-	},
-	{ timeout: defaultTimeoutMs },
-)
-
-test(
-	'manual reindex endpoint rejects oversized payloads',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: 'x'.repeat(workshopIndexRequestBodyMaxChars + 1),
-			},
-		)
-
-		expect(response.status).toBe(413)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-			details?: Array<string>
-		}
-		expect(payload).toEqual({
-			ok: false,
-			error: 'Reindex payload is too large.',
-			details: [
-				`Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`,
-			],
-		})
-	},
-	{ timeout: defaultTimeoutMs },
-)
-
-const networkTest = runWorkshopNetworkReindexTest ? test : test.skip
-
-networkTest(
-	'manual reindex endpoint rejects unknown workshop filters',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					workshops: ['not-a-real-workshop-slug-for-test'],
-				}),
-			},
-		)
-
-		expect(response.status).toBe(400)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-			details?: Array<string>
-		}
-		expect(payload.ok).toBe(false)
-		expect(payload.error).toBe('Invalid reindex payload.')
-		expect(payload.details).toEqual([
-			'Unknown workshop filter(s): not-a-real-workshop-slug-for-test.',
-		])
-	},
-	{ timeout: indexingTimeoutMs },
-)
-
-networkTest(
-	'manual reindex endpoint normalizes and sorts unknown workshop filter errors',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const response = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					workshops: ['Z-WORKSHOP', 'a-workshop'],
-				}),
-			},
-		)
-
-		expect(response.status).toBe(400)
-		const payload = (await response.json()) as {
-			ok: boolean
-			error: string
-			details?: Array<string>
-		}
-		expect(payload.ok).toBe(false)
-		expect(payload.error).toBe('Invalid reindex payload.')
-		expect(payload.details).toEqual([
-			'Unknown workshop filter(s): a-workshop, z-workshop.',
-		])
-	},
-	{ timeout: indexingTimeoutMs },
-)
-
-networkTest(
-	'manual reindex endpoint indexes real workshop data for retrieval tools',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-
-		const reindexResponse = await fetch(
-			new URL('/internal/workshop-index/reindex', server.origin),
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${testWorkshopIndexAdminToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					workshops: ' MCP-FUNDAMENTALS,\nmcp-fundamentals ',
-				}),
-			},
-		)
-		const reindexPayload = (await reindexResponse.json()) as {
-			ok: boolean
-			error?: string
-			workshopCount: number
-			exerciseCount: number
-			stepCount: number
-			sectionCount: number
-			sectionChunkCount: number
-		}
-		if (reindexResponse.status !== 200) {
-			throw new Error(
-				`Manual reindex failed with status ${reindexResponse.status}: ${reindexPayload.error ?? 'unknown error'}${server.getCapturedOutput()}`,
-			)
-		}
-		expect(reindexPayload.ok).toBe(true)
-		expect(reindexPayload.workshopCount).toBe(1)
-		expect(reindexPayload.exerciseCount).toBeGreaterThan(0)
-		expect(reindexPayload.stepCount).toBeGreaterThan(0)
-		expect(reindexPayload.sectionCount).toBeGreaterThan(0)
-		expect(reindexPayload.sectionChunkCount).toBeGreaterThan(0)
-
-		await using mcpClient = await createMcpClient(server.origin, database.user)
-		const listResult = await mcpClient.client.callTool({
-			name: 'list_workshops',
-			arguments: {
-				limit: 20,
-			},
-		})
-		const listPayload = JSON.parse(
-			getTextResultContent(listResult as CallToolResult),
-		) as {
-			workshops: Array<{ workshop: string; exerciseCount: number }>
-		}
-		expect(
-			listPayload.workshops.some(
-				(workshop) =>
-					workshop.workshop === 'mcp-fundamentals' &&
-					workshop.exerciseCount > 0,
-			),
-		).toBe(true)
-
-		const randomLearningContext = await mcpClient.client.callTool({
-			name: 'retrieve_learning_context',
-			arguments: {
-				random: true,
-				maxChars: 2_000,
-			},
-		})
-		const randomPayload = JSON.parse(
-			getTextResultContent(randomLearningContext as CallToolResult),
-		) as {
-			workshop: string
-			exerciseNumber: number
-			sections: Array<{ kind: string; content: string }>
-		}
-		expect(randomPayload.workshop).toBe('mcp-fundamentals')
-		expect(randomPayload.exerciseNumber).toBeGreaterThan(0)
-		expect(randomPayload.sections.length).toBeGreaterThan(0)
-	},
-	{ timeout: indexingTimeoutMs },
 )
 
 test(

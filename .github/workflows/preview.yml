@@ -233,8 +233,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           APP_WORKER_NAME: ${{ steps.names.outputs.worker_name }}
           OVERRIDES_FILE: ${{ steps.deploy_mocks.outputs.overrides_file }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
           WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS:
             ${{ secrets.WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS }}
           WORKSHOP_CONTEXT_HARD_MAX_CHARS:
@@ -251,7 +249,7 @@ jobs:
             exit 1
           fi
 
-          bun tools/ci/sync-worker-secrets.ts --env preview --name "$APP_WORKER_NAME" --from-dotenv "$ENV_FILE" --from-dotenv "$OVERRIDES_FILE" --generate-cookie-secret --include-empty --set-from-env-optional GITHUB_TOKEN --set-from-env-optional WORKSHOP_INDEX_ADMIN_TOKEN --set-from-env-optional WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional WORKSHOP_CONTEXT_HARD_MAX_CHARS
+          bun tools/ci/sync-worker-secrets.ts --env preview --name "$APP_WORKER_NAME" --from-dotenv "$ENV_FILE" --from-dotenv "$OVERRIDES_FILE" --generate-cookie-secret --include-empty --set-from-env-optional WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional WORKSHOP_CONTEXT_HARD_MAX_CHARS
 
       - name: ☁️ Deploy preview app Worker
         id: deploy_preview

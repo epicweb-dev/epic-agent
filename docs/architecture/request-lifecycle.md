@@ -24,11 +24,9 @@ Requests are handled in this order:
    - `/.well-known/oauth-protected-resource` (and the `/mcp` variant)
 4. MCP endpoint:
    - `/mcp` (requires OAuth bearer token)
-5. Manual workshop reindex endpoint:
-   - `/internal/workshop-index/reindex` (requires admin bearer token)
-6. Static assets:
+5. Static assets:
    - Served from `ASSETS` for `GET` and `HEAD` when available
-7. App server routes:
+6. App server routes:
    - Everything else is handled by `server/handler.ts`
 
 ## App server flow

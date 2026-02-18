@@ -71,8 +71,6 @@ jobs:
           RESEND_API_BASE_URL: ${{ secrets.RESEND_API_BASE_URL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          WORKSHOP_INDEX_ADMIN_TOKEN: ${{ secrets.WORKSHOP_INDEX_ADMIN_TOKEN }}
           WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS:
             ${{ secrets.WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS }}
           WORKSHOP_CONTEXT_HARD_MAX_CHARS:
@@ -82,10 +80,8 @@ jobs:
           COOKIE_SECRET --set-from-env-optional APP_BASE_URL
           --set-from-env-optional RESEND_API_BASE_URL --set-from-env-optional
           RESEND_API_KEY --set-from-env-optional RESEND_FROM_EMAIL
-          --set-from-env-optional GITHUB_TOKEN --set-from-env-optional
-          WORKSHOP_INDEX_ADMIN_TOKEN --set-from-env-optional
-          WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS --set-from-env-optional
-          WORKSHOP_CONTEXT_HARD_MAX_CHARS
+          --set-from-env-optional WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS
+          --set-from-env-optional WORKSHOP_CONTEXT_HARD_MAX_CHARS
 
       - name: 🗄️ Apply D1 Migrations
         if: steps.sha_guard.outputs.should_deploy == 'true'

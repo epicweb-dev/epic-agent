@@ -88,9 +88,7 @@
 			],
 		},
 		"test": {
-			"vars": {
-				"WORKSHOP_INDEX_ADMIN_TOKEN": "test-workshop-index-token",
-			},
+			"vars": {},
 			"assets": {
 				"directory": "./public",
 				"binding": "ASSETS",

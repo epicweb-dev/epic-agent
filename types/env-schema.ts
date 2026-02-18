@@ -48,8 +48,6 @@ export const EnvSchema = z.object({
 	RESEND_API_BASE_URL: resendApiBaseUrlSchema,
 	RESEND_API_KEY: optionalNonEmptyString,
 	RESEND_FROM_EMAIL: optionalNonEmptyString,
-	GITHUB_TOKEN: optionalNonEmptyString,
-	WORKSHOP_INDEX_ADMIN_TOKEN: optionalNonEmptyString,
 	WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS: optionalPositiveInteger,
 	WORKSHOP_CONTEXT_HARD_MAX_CHARS: optionalPositiveInteger,
 })

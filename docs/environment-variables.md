@@ -6,7 +6,10 @@ types, runtime validation, and documentation in sync.
 ## Steps
 
 1. **Add the type**
-   - Update `types/env.d.ts` so `Env` includes the new variable.
+   - Most env vars: add them to `types/env-schema.ts` so the inferred `AppEnv`
+     (and `types/env.d.ts`'s global `Env`) include the new variable.
+   - If you add a new Workers binding type (D1/KV/Vectorize/AI/etc), also update
+     `tools/cloudflare-bindings.d.ts`.
 
 2. **Validate at runtime**
    - Add the variable to the Zod schema in `types/env-schema.ts`.
@@ -29,8 +32,7 @@ types, runtime validation, and documentation in sync.
    			1,
    			'Missing THIRD_PARTY_API_KEY. Go to https://example.com/ to get one.',
    		),
-   	WORKSHOP_INDEX_ADMIN_TOKEN: z.string().optional(),
-   	GITHUB_TOKEN: z.string().optional(),
+   	APP_BASE_URL: z.string().url().optional(),
    	WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS: z.number().int().positive().optional(),
    	WORKSHOP_CONTEXT_HARD_MAX_CHARS: z.number().int().positive().optional(),
    })
