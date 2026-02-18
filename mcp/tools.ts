@@ -52,16 +52,18 @@ function buildErrorResult({
 function buildInputValidationErrorResult({
 	tool,
 	error,
+	next,
 }: {
 	tool: string
 	error: z.ZodError
+	next?: Array<string>
 }) {
 	return buildErrorResult({
 		title: 'Input validation error',
 		message: `Tool: \`${tool}\`\n\n${error.message}`,
 		next: [
 			'Double-check required fields and value ranges in the tool description.',
-			'When scoping by stepNumber, also provide exerciseNumber.',
+			...(next ?? []),
 		],
 		structuredContent: {
 			error: 'INPUT_VALIDATION_ERROR',
@@ -229,6 +231,7 @@ export async function registerTools(agent: MCP) {
 				return buildInputValidationErrorResult({
 					tool: toolsMetadata.retrieve_learning_context.name,
 					error: args.error,
+					next: ['When scoping by stepNumber, also provide exerciseNumber.'],
 				})
 			}
 			try {
@@ -298,6 +301,7 @@ export async function registerTools(agent: MCP) {
 				return buildInputValidationErrorResult({
 					tool: toolsMetadata.retrieve_diff_context.name,
 					error: args.error,
+					next: ['When scoping by stepNumber, also provide exerciseNumber.'],
 				})
 			}
 			try {
@@ -376,6 +380,7 @@ export async function registerTools(agent: MCP) {
 				return buildInputValidationErrorResult({
 					tool: toolsMetadata.search_topic_context.name,
 					error: args.error,
+					next: ['When scoping by stepNumber, also provide exerciseNumber.'],
 				})
 			}
 			try {
