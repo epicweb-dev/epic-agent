@@ -141,18 +141,15 @@ function injectBaseUrlIntoExecutionContext(
 async function raceWithTimeout<T>({
 	action,
 	timeoutMs,
-	onTimeout,
 	timeoutMessage,
 }: {
 	action: Promise<T>
 	timeoutMs: number
-	onTimeout: () => void | Promise<void>
 	timeoutMessage: string
 }): Promise<T> {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null
 	const timeoutPromise = new Promise<never>((_resolve, reject) => {
 		timeoutId = setTimeout(() => {
-			void onTimeout()
 			reject(new Error(timeoutMessage))
 		}, timeoutMs)
 	})
@@ -280,7 +277,6 @@ export async function handleChatTurnRequest({
 				const result = await raceWithTimeout({
 					action: mcp.client.listTools(),
 					timeoutMs: mcpOperationTimeoutMs,
-					onTimeout: mcp.close,
 					timeoutMessage: `Timed out listing MCP tools after ${mcpOperationTimeoutMs}ms.`,
 				})
 				const lines = [
@@ -305,7 +301,6 @@ export async function handleChatTurnRequest({
 					arguments: plan.toolArguments,
 				}),
 				timeoutMs: mcpOperationTimeoutMs,
-				onTimeout: mcp.close,
 				timeoutMessage: `Timed out calling MCP tool "${plan.toolName}" after ${mcpOperationTimeoutMs}ms.`,
 			})) as CallToolResult
 
