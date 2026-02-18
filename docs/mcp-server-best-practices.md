@@ -306,38 +306,50 @@ machine-friendly data in `structuredContent`.
 
 ---
 
-## 7. Centralized Metadata
+## 7. Tool Modules (Colocated Configuration)
 
 ### What Great Servers Do
 
-Keep tool/prompt/resource metadata in a centralized file:
+Keep each tool's configuration (title, description, annotations, schemas) next
+to its handler implementation. This reduces drift between schemas, descriptions,
+and behavior.
 
 ```typescript
-// config/metadata.ts
-export const serverMetadata = {
-	title: 'Media Server',
-	instructions: `...comprehensive instructions...`,
-}
+// mcp/tools/list-workshops.ts
+const outputSchema = z.object({
+	workshops: z.array(z.object({ workshop: z.string() /* ... */ })),
+	nextCursor: z.string().optional(),
+})
 
-export const toolsMetadata = {
-	list_feeds: {
-		name: 'list_feeds',
-		title: 'List Feeds',
-		description: '...detailed description...',
-	},
-	// ... more tools
+export function registerListWorkshopsTool(agent: MCP) {
+	agent.server.registerTool(
+		'list_workshops',
+		{
+			title: 'List Workshops',
+			description: 'List indexed workshops and coverage.',
+			inputSchema: listWorkshopsInputSchema,
+			outputSchema,
+			annotations: readOnlyToolAnnotations,
+		},
+		async (args) => {
+			// ... implementation ...
+			return { content: [...], structuredContent: { workshops: [] } }
+		},
+	)
 }
 ```
 
 **Benefits:**
 
-- Single source of truth for descriptions
-- Easy to review/update all metadata
-- Consistent naming and style
-- Can be extracted for documentation
+- Schema + implementation drift is less likely
+- Easier to reason about one tool at a time
+- Encourages concise, use-case focused descriptions
 
-**Example in this repo:** Server/tool metadata is centralized and the MCP server
-implementation consumes it.
+**Centralization is still useful** for server-level instructions and shared
+annotations; tool-level config is often easiest to maintain when colocated.
+
+**Example in this repo:** Tools are registered in `mcp/register-tools.ts` and
+implemented in `mcp/tools/*.ts`.
 
 ---
 
