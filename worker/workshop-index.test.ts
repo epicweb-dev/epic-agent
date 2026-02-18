@@ -12,6 +12,7 @@ import {
 function createEnv(overrides: Partial<Env> = {}) {
 	return {
 		WORKSHOP_INDEX_ADMIN_TOKEN: 'admin-token',
+		WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX: '1',
 		...overrides,
 	} as Env
 }
@@ -20,6 +21,8 @@ const workshopFilterMaxErrorMessage = `workshops must include at most ${workshop
 const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
 const batchSizeMaxErrorMessage = `batchSize must be at most ${workshopIndexBatchMaxSize}.`
 const batchSizeMinErrorMessage = 'batchSize must be at least 1.'
+const remoteReindexDisabledMessage =
+	'Manual workshop reindex is disabled on remote deployments. Use the GitHub Actions workflow "Load Workshop Content" to populate D1 (and Vectorize) instead.'
 
 test('workshop index route rejects non-POST methods', async () => {
 	const response = await handleWorkshopIndexRequest(
@@ -30,6 +33,25 @@ test('workshop index route rejects non-POST methods', async () => {
 	)
 
 	expect(response.status).toBe(405)
+})
+
+test('workshop index route returns 403 when remote reindex is disabled', async () => {
+	const response = await handleWorkshopIndexRequest(
+		new Request(`https://example.com${workshopIndexRoutePath}`, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer admin-token',
+			},
+		}),
+		createEnv({ WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX: undefined }),
+	)
+
+	expect(response.status).toBe(403)
+	const payload = await response.json()
+	expect(payload).toEqual({
+		ok: false,
+		error: remoteReindexDisabledMessage,
+	})
 })
 
 test('workshop index route returns 503 when token is missing', async () => {

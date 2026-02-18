@@ -23,6 +23,8 @@ Quick notes for getting a local epic-agent environment running.
   - set `WORKSHOP_INDEX_ADMIN_TOKEN` in `.env`
   - call `POST /internal/workshop-index/reindex` with
     `Authorization: Bearer <token>` (bearer scheme is case-insensitive)
+  - note: the reindex endpoint is localhost-only by default; remote calls
+    require `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1`
   - optional `workshops` payload can be an array or comma/newline-delimited
     string; values are normalized to lowercase slugs
   - optional batching fields:

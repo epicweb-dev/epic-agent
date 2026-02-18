@@ -116,6 +116,9 @@ Optional (deployed Worker endpoint):
 - `POST /internal/workshop-index/reindex`
 - `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
   case-insensitive)
+- By default, this endpoint only works on localhost. Set
+  `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1` (or `true`/`yes`) to allow remote
+  requests (not recommended).
 
 The reindex route refreshes indexed workshop metadata, sections, and optional
 vector chunks used by retrieval tools. Optional `workshops` filters may be sent

@@ -25,7 +25,8 @@ Requests are handled in this order:
 4. MCP endpoint:
    - `/mcp` (requires OAuth bearer token)
 5. Manual workshop reindex endpoint:
-   - `/internal/workshop-index/reindex` (requires admin bearer token)
+   - `/internal/workshop-index/reindex` (requires admin bearer token;
+     localhost-only by default)
 6. Static assets:
    - Served from `ASSETS` for `GET` and `HEAD` when available
 7. App server routes:

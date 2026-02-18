@@ -50,6 +50,7 @@ export const EnvSchema = z.object({
 	RESEND_FROM_EMAIL: optionalNonEmptyString,
 	GITHUB_TOKEN: optionalNonEmptyString,
 	WORKSHOP_INDEX_ADMIN_TOKEN: optionalNonEmptyString,
+	WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX: optionalNonEmptyString,
 	WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS: optionalPositiveInteger,
 	WORKSHOP_CONTEXT_HARD_MAX_CHARS: optionalPositiveInteger,
 })

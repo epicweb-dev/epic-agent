@@ -19,11 +19,39 @@ const workshopFilterMaxErrorMessage = `workshops must include at most ${workshop
 const requestBodyMaxErrorMessage = `Request body must be at most ${workshopIndexRequestBodyMaxChars} characters.`
 const batchSizeMaxErrorMessage = `batchSize must be at most ${workshopIndexBatchMaxSize}.`
 const batchSizeMinErrorMessage = 'batchSize must be at least 1.'
+const remoteReindexDisabledMessage =
+	'Manual workshop reindex is disabled on remote deployments. Use the GitHub Actions workflow "Load Workshop Content" to populate D1 (and Vectorize) instead.'
 
 const workshopFilterSchema = z.array(z.string().trim().min(1))
 
 function stripLeadingBom(value: string) {
 	return value.startsWith('\uFEFF') ? value.slice(1) : value
+}
+
+function parseBooleanFlag(value: string | undefined) {
+	const normalized = (value ?? '').trim().toLowerCase()
+	if (normalized === '1' || normalized === 'true' || normalized === 'yes')
+		return true
+	if (normalized === '0' || normalized === 'false' || normalized === 'no')
+		return false
+	return false
+}
+
+function isLocalHostname(hostname: string) {
+	const normalized = hostname.trim().toLowerCase()
+	return (
+		normalized === 'localhost' ||
+		normalized === '127.0.0.1' ||
+		normalized === '::1'
+	)
+}
+
+function isLocalRequest(request: Request) {
+	try {
+		return isLocalHostname(new URL(request.url).hostname)
+	} catch {
+		return false
+	}
 }
 
 function looksLikeJson(value: string) {
@@ -232,6 +260,19 @@ export async function handleWorkshopIndexRequest(
 ) {
 	if (request.method !== 'POST') {
 		return methodNotAllowedResponse()
+	}
+
+	const allowRemoteReindex = parseBooleanFlag(
+		env.WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX,
+	)
+	if (!isLocalRequest(request) && !allowRemoteReindex) {
+		return Response.json(
+			{
+				ok: false,
+				error: remoteReindexDisabledMessage,
+			},
+			{ status: 403 },
+		)
 	}
 
 	const configuredToken = env.WORKSHOP_INDEX_ADMIN_TOKEN?.trim()

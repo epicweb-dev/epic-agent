@@ -47,6 +47,9 @@ Local development uses `.env`, which Wrangler loads automatically:
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
 - `GITHUB_TOKEN` (optional but recommended for workshop indexing rate limits)
 - `WORKSHOP_INDEX_ADMIN_TOKEN` (required to call manual reindex endpoint)
+- `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX` (optional; set to `1`/`true`/`yes` to
+  allow calling the manual reindex endpoint on a deployed Worker; localhost-only
+  by default)
 - `WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS` (optional, default `50000`)
 - `WORKSHOP_CONTEXT_HARD_MAX_CHARS` (optional, default `80000`)
 
@@ -55,6 +58,8 @@ Manual reindex endpoint:
 - `POST /internal/workshop-index/reindex`
 - `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
   case-insensitive)
+- Remote requests require `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1`; otherwise the
+  endpoint only accepts localhost requests.
 
 The reindex endpoint also supports cursor batching to reduce the risk of
 long-running requests:

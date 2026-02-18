@@ -77,6 +77,11 @@ manual indexing runs and is separate from OAuth MCP auth.
 The admin token uses the `Authorization: Bearer <token>` header, where the
 bearer scheme is case-insensitive (`Bearer` / `bearer`).
 
+By default, the reindex endpoint only accepts requests on localhost
+(development) to prevent production deployments from calling GitHub. To allow
+remote requests (not recommended), set `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1`
+(or `true`/`yes`) in addition to `WORKSHOP_INDEX_ADMIN_TOKEN`.
+
 ## What to read when changing auth
 
 - `worker/index.ts` for route order and integration points

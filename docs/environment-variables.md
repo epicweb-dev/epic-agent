@@ -6,7 +6,7 @@ types, runtime validation, and documentation in sync.
 ## Steps
 
 1. **Add the type**
-   - Update `types/env.d.ts` so `Env` includes the new variable.
+   - Update `tools/cloudflare-bindings.d.ts` so `Env` includes the new variable.
 
 2. **Validate at runtime**
    - Add the variable to the Zod schema in `types/env-schema.ts`.
