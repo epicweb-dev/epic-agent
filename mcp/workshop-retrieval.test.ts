@@ -429,7 +429,20 @@ test('searchTopicContext falls back to keyword search without vector bindings', 
 	expect(result.matches.length).toBe(1)
 })
 
-test('retrieveWorkshopList clamps limit to shared max', async () => {
+async function runRetrieveWorkshopListWithFixedRows({
+	limit,
+	rows,
+}: {
+	limit?: number
+	rows: Array<{
+		workshop_slug: string
+		title: string
+		exercise_count: number
+		has_diffs: number
+		last_indexed_at: string
+		product?: string
+	}>
+}) {
 	const observedListBindCalls: Array<Array<number>> = []
 	const db = {
 		prepare() {
@@ -439,16 +452,7 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 					return {
 						async all() {
 							return {
-								results: [
-									{
-										workshop_slug: 'mcp-fundamentals',
-										title: 'MCP Fundamentals',
-										exercise_count: 3,
-										has_diffs: 1,
-										last_indexed_at: '2026-02-14T00:00:00.000Z',
-										product: 'epicweb',
-									},
-								],
+								results: rows,
 							}
 						},
 					}
@@ -457,37 +461,35 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 		},
 	} as unknown as D1Database
 	const env = { APP_DB: db } as unknown as Env
+	const input = typeof limit === 'number' ? { env, limit } : { env }
+	const result = await retrieveWorkshopList(input)
+	return { observedListBindCalls, result }
+}
 
-	const result = await retrieveWorkshopList({
-		env,
-		limit: 999,
-	})
+test('retrieveWorkshopList clamps limit to shared max', async () => {
+	const { observedListBindCalls, result } =
+		await runRetrieveWorkshopListWithFixedRows({
+			limit: 999,
+			rows: [
+				{
+					workshop_slug: 'mcp-fundamentals',
+					title: 'MCP Fundamentals',
+					exercise_count: 3,
+					has_diffs: 1,
+					last_indexed_at: '2026-02-14T00:00:00.000Z',
+					product: 'epicweb',
+				},
+			],
+		})
 
 	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
 	expect(result.workshops).toHaveLength(1)
 })
 
 test('retrieveWorkshopList defaults limit to shared max', async () => {
-	const observedListBindCalls: Array<Array<number>> = []
-	const db = {
-		prepare() {
-			return {
-				bind(...args: Array<number>) {
-					observedListBindCalls.push(args)
-					return {
-						async all() {
-							return {
-								results: [],
-							}
-						},
-					}
-				},
-			}
-		},
-	} as unknown as D1Database
-	const env = { APP_DB: db } as unknown as Env
-
-	await retrieveWorkshopList({ env })
+	const { observedListBindCalls } = await runRetrieveWorkshopListWithFixedRows({
+		rows: [],
+	})
 
 	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
 })
