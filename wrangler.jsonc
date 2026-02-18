@@ -16,6 +16,13 @@
 	},
 	"env": {
 		"production": {
+			"ai": { "binding": "AI" },
+			"vectorize": [
+				{
+					"binding": "WORKSHOP_VECTOR_INDEX",
+					"index_name": "epic-agent-workshop-vector-index",
+				},
+			],
 			"assets": {
 				"directory": "./public",
 				"binding": "ASSETS",
@@ -45,6 +52,13 @@
 			],
 		},
 		"preview": {
+			"ai": { "binding": "AI" },
+			"vectorize": [
+				{
+					"binding": "WORKSHOP_VECTOR_INDEX",
+					"index_name": "epic-agent-workshop-vector-index",
+				},
+			],
 			"assets": {
 				"directory": "./public",
 				"binding": "ASSETS",
