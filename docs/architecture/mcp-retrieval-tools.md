@@ -98,10 +98,10 @@ Enabling semantic search:
 - Create a Vectorize index with `dimensions: 768` and `metric: cosine`.
 - Bind it in `wrangler.jsonc` as `WORKSHOP_VECTOR_INDEX` via the `vectorize`
   config, and add an `ai` binding named `AI`.
-- Re-run workshop indexing to populate vectors (GitHub Actions
-  `🧠 Load Workshop Content` or `POST /internal/workshop-index/reindex`).
+- Re-run workshop indexing to populate vectors (GitHub Actions workflow "Load
+  Workshop Content").
 
-## Manual indexing trigger
+## Indexing trigger
 
 Indexing is handled outside MCP tool calls.
 
@@ -110,35 +110,3 @@ Recommended (CI):
 - Run the `🧠 Load Workshop Content` GitHub Actions workflow, which executes
   `bun tools/workshop-content-load-from-clones.ts` and indexes directly into D1
   (and Vectorize when configured) using Cloudflare APIs.
-
-Optional (deployed Worker endpoint):
-
-- `POST /internal/workshop-index/reindex`
-- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
-  case-insensitive)
-- By default, this endpoint only works on localhost. Set
-  `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1` (or `true`/`yes`) to allow remote
-  requests (not recommended).
-
-The reindex route refreshes indexed workshop metadata, sections, and optional
-vector chunks used by retrieval tools. Optional `workshops` filters may be sent
-as an array or as a comma/newline-delimited string; values are trimmed,
-lowercased, and deduplicated server-side. Empty lists fall back to full
-discovery-based reindex. For operational safety, the route accepts at most 100
-workshop filters after normalization (trim/lowercase/dedupe). If any requested
-workshop slug is unknown, the request fails with a `400` invalid-payload
-response and explicit details. The route also rejects malformed JSON payloads
-with `400` instead of silently defaulting to full reindex behavior. The route
-enforces a maximum request body size (50,000 characters), including an early
-`Content-Length` guard when present, and returns `413` when exceeded.
-
-To avoid long-running request timeouts, the reindex route also supports optional
-pagination:
-
-- request fields: `cursor` and `batchSize` (1-20)
-- response field: `nextCursor` (present when more workshops remain)
-
-Indexer GitHub API requests include bounded retry/backoff for transient failures
-(network fetch failures, 5xx/429, and secondary rate limits) before surfacing an
-error, and they honor `Retry-After` delays when provided by GitHub (capped to a
-bounded maximum delay).

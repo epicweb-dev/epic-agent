@@ -61,13 +61,10 @@ declare global {
 
 	interface Env {
 		APP_DB: D1Database
-		GITHUB_TOKEN?: string
 		WORKSHOP_VECTOR_INDEX?: Vectorize
 		AI?: Ai
 		WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS?: number
 		WORKSHOP_CONTEXT_HARD_MAX_CHARS?: number
-		WORKSHOP_INDEX_ADMIN_TOKEN?: string
-		WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX?: string
 	}
 }
 

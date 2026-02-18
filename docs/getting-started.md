@@ -75,10 +75,6 @@ bun ./docs/post-download.ts --guided
   URLs and for reliable token-based Wrangler CI commands)
 - `COOKIE_SECRET` (generate with `openssl rand -hex 32` or similar)
 - `APP_BASE_URL` (production app URL)
-- `WORKSHOP_INDEX_ADMIN_TOKEN` (optional; only required if you plan to call the
-  protected reindex endpoint on the deployed Worker)
-- `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX` (optional; set to `1`/`true`/`yes` to
-  allow calling the reindex endpoint remotely; localhost-only by default)
 - `GITHUB_TOKEN` (optional but recommended for higher indexing throughput and/or
   indexing private workshop repos; defaults to the GitHub Actions token when
   absent)

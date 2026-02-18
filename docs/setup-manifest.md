@@ -45,27 +45,8 @@ Local development uses `.env`, which Wrangler loads automatically:
 - `RESEND_API_BASE_URL` (optional, defaults to `https://api.resend.com`)
 - `RESEND_API_KEY` (optional, required to send via Resend)
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
-- `GITHUB_TOKEN` (optional but recommended for workshop indexing rate limits)
-- `WORKSHOP_INDEX_ADMIN_TOKEN` (required to call manual reindex endpoint)
-- `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX` (optional; set to `1`/`true`/`yes` to
-  allow calling the manual reindex endpoint on a deployed Worker; localhost-only
-  by default)
 - `WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS` (optional, default `50000`)
 - `WORKSHOP_CONTEXT_HARD_MAX_CHARS` (optional, default `80000`)
-
-Manual reindex endpoint:
-
-- `POST /internal/workshop-index/reindex`
-- `Authorization: Bearer <WORKSHOP_INDEX_ADMIN_TOKEN>` (bearer scheme is
-  case-insensitive)
-- Remote requests require `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1`; otherwise the
-  endpoint only accepts localhost requests.
-
-The reindex endpoint also supports cursor batching to reduce the risk of
-long-running requests:
-
-- request fields: `cursor` and `batchSize` (1-20)
-- response field: `nextCursor` (present when more workshops remain)
 
 Tests use `.env.test` when `CLOUDFLARE_ENV=test` (set by Playwright).
 
@@ -83,8 +64,6 @@ Configure these secrets for deploy workflows:
 - `RESEND_FROM_EMAIL` (optional, required to send via Resend)
 - `GITHUB_TOKEN` (optional, recommended for indexing throughput and/or indexing
   private workshop repos; defaults to the GitHub Actions token when absent)
-- `WORKSHOP_INDEX_ADMIN_TOKEN` (optional; only required if you still want to
-  call the protected manual reindex endpoint on the deployed Worker)
 - `WORKSHOP_VECTORIZE_INDEX_NAME` (optional; override Vectorize index name for
   CI indexing in production; otherwise defaults to
   `<wrangler.jsonc name>-workshop-vector-index`)

@@ -68,20 +68,6 @@ OAuth endpoints are implemented in `worker/oauth-handlers.ts` and routed from
 - Audience must match the app origin or `<origin>/mcp`
 - Unauthenticated requests return `401` with `WWW-Authenticate` metadata
 
-## Admin token for workshop reindex
-
-`POST /internal/workshop-index/reindex` is protected with a dedicated bearer
-token (`WORKSHOP_INDEX_ADMIN_TOKEN`). This endpoint is intended for explicit
-manual indexing runs and is separate from OAuth MCP auth.
-
-The admin token uses the `Authorization: Bearer <token>` header, where the
-bearer scheme is case-insensitive (`Bearer` / `bearer`).
-
-By default, the reindex endpoint only accepts requests on localhost
-(development) to prevent production deployments from calling GitHub. To allow
-remote requests (not recommended), set `WORKSHOP_INDEX_ALLOW_REMOTE_REINDEX=1`
-(or `true`/`yes`) in addition to `WORKSHOP_INDEX_ADMIN_TOKEN`.
-
 ## What to read when changing auth
 
 - `worker/index.ts` for route order and integration points

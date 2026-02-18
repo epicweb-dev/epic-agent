@@ -32,8 +32,7 @@ types, runtime validation, and documentation in sync.
    			1,
    			'Missing THIRD_PARTY_API_KEY. Go to https://example.com/ to get one.',
    		),
-   	WORKSHOP_INDEX_ADMIN_TOKEN: z.string().optional(),
-   	GITHUB_TOKEN: z.string().optional(),
+   	APP_BASE_URL: z.string().url().optional(),
    	WORKSHOP_CONTEXT_DEFAULT_MAX_CHARS: z.number().int().positive().optional(),
    	WORKSHOP_CONTEXT_HARD_MAX_CHARS: z.number().int().positive().optional(),
    })

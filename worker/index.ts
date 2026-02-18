@@ -16,12 +16,10 @@ import {
 	mcpResourcePath,
 } from './mcp-auth.ts'
 import { withCors } from './utils.ts'
-import {
-	handleWorkshopIndexRequest,
-	workshopIndexRoutePath,
-} from './workshop-index.ts'
 
 export { MCP }
+
+const disabledWorkshopIndexRoutePath = '/internal/workshop-index/reindex'
 
 const appHandler = withCors({
 	getCorsHeaders(request) {
@@ -70,8 +68,10 @@ const appHandler = withCors({
 			})
 		}
 
-		if (url.pathname === workshopIndexRoutePath) {
-			return handleWorkshopIndexRequest(request, env)
+		// Indexing is intentionally not available from the app runtime. Workshop
+		// content is loaded via GitHub Actions into D1 (and Vectorize).
+		if (url.pathname === disabledWorkshopIndexRoutePath) {
+			return Response.json({ ok: false, error: 'Not Found' }, { status: 404 })
 		}
 
 		// Try to serve static assets for safe methods only
