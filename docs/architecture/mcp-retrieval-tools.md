@@ -27,6 +27,7 @@ Supported filters:
 - `product`
 - `hasDiffs`
 - `limit` is clamped to a maximum of `100` per request
+- when `limit` is omitted, the tool defaults to returning up to `100` workshops
 
 ## `retrieve_learning_context`
 

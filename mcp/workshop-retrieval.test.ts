@@ -467,6 +467,31 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 	expect(result.workshops).toHaveLength(1)
 })
 
+test('retrieveWorkshopList defaults limit to shared max', async () => {
+	const observedListBindCalls: Array<Array<number>> = []
+	const db = {
+		prepare() {
+			return {
+				bind(...args: Array<number>) {
+					observedListBindCalls.push(args)
+					return {
+						async all() {
+							return {
+								results: [],
+							}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+	const env = { APP_DB: db } as unknown as Env
+
+	await retrieveWorkshopList({ env })
+
+	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
+})
+
 test('searchTopicContext validates workshop scope before binding checks', async () => {
 	const { db } = createMockDb({
 		rowsByVectorId: {},

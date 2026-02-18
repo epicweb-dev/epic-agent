@@ -169,7 +169,11 @@ export async function retrieveWorkshopList({
 	hasDiffs?: boolean
 }) {
 	const startedAt = Date.now()
-	const maxLimit = Math.min(Math.max(limit ?? 20, 1), listWorkshopsMaxLimit)
+	const requestedLimit =
+		typeof limit === 'number' && Number.isFinite(limit)
+			? limit
+			: listWorkshopsMaxLimit
+	const maxLimit = Math.min(Math.max(requestedLimit, 1), listWorkshopsMaxLimit)
 	const result = await listIndexedWorkshops({
 		db: env.APP_DB,
 		limit: maxLimit,
