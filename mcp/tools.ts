@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { type MCP } from './index.ts'
 import {
+	buildQuizInstructionsResult,
+	retrieveQuizInstructionsInputSchema,
+} from './quiz-instructions.ts'
+import {
 	listWorkshopsInputSchema,
 	searchTopicContextInputSchema,
 	retrieveDiffContextInputSchema,
@@ -146,6 +150,37 @@ export async function registerTools(agent: MCP) {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error)
 				return buildErrorResult(`Unable to search topic context: ${message}`)
+			}
+		},
+	)
+
+	agent.server.registerTool(
+		'retrieve_quiz_instructions',
+		{
+			description:
+				'Return evidence-based instructions for conducting a quiz (one question at a time, immediate feedback, spaced retrieval). Use when the learner wants to be quizzed or to solidify understanding.',
+			inputSchema: retrieveQuizInstructionsInputSchema,
+		},
+		async (rawArgs: unknown) => {
+			const args = retrieveQuizInstructionsInputSchema.safeParse(rawArgs ?? {})
+			if (!args.success) {
+				return buildErrorResult(`Invalid input: ${args.error.message}`)
+			}
+
+			try {
+				const result = buildQuizInstructionsResult(args.data)
+				return {
+					content: [
+						{ type: 'text', text: result.instructionsMarkdown },
+						{ type: 'text', text: formatJson(result) },
+					],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(
+					`Unable to retrieve quiz instructions: ${message}`,
+				)
 			}
 		},
 	)

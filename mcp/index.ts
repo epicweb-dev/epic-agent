@@ -15,7 +15,7 @@ export class MCP extends McpAgent<Env, State, Props> {
 		},
 		{
 			instructions:
-				'Use this server to retrieve indexed Epic Workshop context for quiz authoring.',
+				'Use this server to retrieve indexed Epic Workshop context for quiz authoring. If a learner asks to be quizzed or wants to solidify understanding, call retrieve_quiz_instructions and follow the protocol (one question at a time).',
 		},
 	)
 	async init() {
