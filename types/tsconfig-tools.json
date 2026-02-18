@@ -36,6 +36,7 @@
 		"../docs/post-download.ts",
 		"../mcp/mcp-server-e2e.test.ts",
 		"../mcp/workshop-indexer.ts",
+		"../mcp/workshop-embeddings.ts",
 		"../mcp/workshop-data.ts",
 		"../mcp/workshop-truncation.ts",
 		"../tools/**/*.ts",

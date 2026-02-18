@@ -14,6 +14,7 @@ import {
 	workshopIndexBatchDefaultSize,
 	workshopIndexBatchMaxSize,
 } from '../shared/workshop-index-constants.ts'
+import { prepareEmbeddingText } from './workshop-embeddings.ts'
 
 type WorkshopRepository = {
 	owner: string
@@ -67,8 +68,6 @@ const maxStoredSectionChars = 20_000
 const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
-// bge-base-en-v1.5 max is 512 tokens; 1:1 for safety with dense code
-const maxEmbeddingChars = 512
 const defaultVectorUpsertBatchSize = 200
 // Vectorize id max is 64 bytes.
 const maxVectorIdBytes = 64
@@ -374,19 +373,6 @@ async function embedChunksIfConfigured({
 	}
 	const aiClient = ai
 
-	function prepareText(content: string): string {
-		const raw = (content ?? '')
-			.replaceAll(
-				// eslint-disable-next-line no-control-regex -- strip control chars for embedding API
-				/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,
-				' ',
-			)
-			.trim()
-		if (raw.length === 0) return ' '
-		if (raw.length <= maxEmbeddingChars) return raw
-		return `${raw.slice(0, maxEmbeddingChars)}\n[truncated]`
-	}
-
 	async function embedBatch(
 		texts: Array<string>,
 	): Promise<Array<Array<number>>> {
@@ -417,7 +403,9 @@ async function embedChunksIfConfigured({
 			}
 		>,
 	): Promise<Array<Array<number>>> {
-		const texts = chunkBatch.map((chunk) => prepareText(chunk.content ?? ''))
+		const texts = chunkBatch.map((chunk) =>
+			prepareEmbeddingText({ content: chunk.content ?? '' }),
+		)
 		try {
 			return await embedBatch(texts)
 		} catch (error) {

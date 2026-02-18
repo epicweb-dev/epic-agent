@@ -5,6 +5,10 @@ import {
 	WorkshopIndexInputError,
 	workshopIndexerTestUtils,
 } from './workshop-indexer.ts'
+import {
+	prepareEmbeddingText,
+	workshopEmbeddingMaxChars,
+} from './workshop-embeddings.ts'
 
 test('parseExerciseFromPath supports workshop exercise paths', () => {
 	const parsed = workshopIndexerTestUtils.parseExerciseFromPath(
@@ -595,4 +599,29 @@ test('resolveRetryDelayMs caps long retry delays', () => {
 			maxDelayMs: 9_000,
 		}),
 	).toBe(9_000)
+})
+
+test('prepareEmbeddingText truncates without leaving dangling surrogates', () => {
+	// Force an emoji to straddle the truncation boundary.
+	const content = `${'a'.repeat(workshopEmbeddingMaxChars - 1)}🦺tail`
+	const prepared = prepareEmbeddingText({
+		content,
+		maxChars: workshopEmbeddingMaxChars,
+	})
+
+	// May exceed the UTF-16 code-unit cap by 1 if we need to include a surrogate
+	// pair (emoji) rather than splitting it.
+	expect(prepared.length).toBeLessThanOrEqual(workshopEmbeddingMaxChars + 1)
+	expect(prepared).toContain('🦺')
+
+	// Ensure we didn't create any unpaired surrogate code units.
+	const hasDanglingHigh = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(prepared)
+	const hasDanglingLow = /(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(prepared)
+	expect(hasDanglingHigh || hasDanglingLow).toBe(false)
+})
+
+test('prepareEmbeddingText strips control chars and keeps a non-empty fallback', () => {
+	const prepared = prepareEmbeddingText({ content: '\x00\t\n\x1f' })
+	expect(prepared.trim().length).toBeGreaterThan(0)
+	expect(prepared).not.toContain('\x00')
 })
