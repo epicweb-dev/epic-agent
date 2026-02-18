@@ -72,7 +72,7 @@ function ChatPage(handle: Handle) {
 		createMessage({
 			role: 'assistant',
 			content:
-				'Chat is connected to the app MCP server. Try `8 + 4`, `/tools`, or `/tool do_math {"left": 8, "right": 4, "operator": "+"}`.',
+				'Chat is connected to the app MCP server. Try `list workshops`, `/tools`, or `/tool list_workshops {"limit": 5}`.',
 		}),
 	]
 

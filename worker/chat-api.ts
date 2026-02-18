@@ -44,10 +44,9 @@ function buildHelpMessage() {
 	return [
 		'Commands:',
 		'- `/tools` — list available MCP tools',
-		'- `/tool <tool_name> <json_args>` — call a tool (example: `/tool do_math {"left": 8, "right": 4, "operator": "+"}`)',
+		'- `/tool <tool_name> <json_args>` — call a tool (example: `/tool list_workshops {"limit": 5}`)',
 		'',
 		'Shortcuts:',
-		'- `8 + 4` (or `8*4`) — calls `do_math`',
 		'- `list workshops` — calls `list_workshops`',
 		'- `search <query>` — calls `search_topic_context`',
 	].join('\n')
@@ -89,26 +88,6 @@ function planTurn(message: string): ToolCallPlan {
 				kind: 'help',
 				content: `Invalid JSON args for /tool: ${errorMessage}\n\n${buildHelpMessage()}`,
 			}
-		}
-	}
-
-	const mathMatch = text.match(
-		/^\s*(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)\s*$/,
-	)
-	if (mathMatch) {
-		const left = Number(mathMatch[1])
-		const operator = mathMatch[2] as '+' | '-' | '*' | '/'
-		const right = Number(mathMatch[3])
-		if (!Number.isFinite(left) || !Number.isFinite(right)) {
-			return {
-				kind: 'help',
-				content: `Invalid numbers.\n\n${buildHelpMessage()}`,
-			}
-		}
-		return {
-			kind: 'call-tool',
-			toolName: 'do_math',
-			toolArguments: { left, right, operator },
 		}
 	}
 
