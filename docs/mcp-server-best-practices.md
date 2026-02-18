@@ -75,6 +75,10 @@ When a server already provides a rich input schema (for example, Zod/JSON Schema
 with per-field `.describe()` metadata), treat the schema as the source of truth
 for parameter types, requiredness, ranges, and per-field descriptions.
 
+Similarly, when a server provides an output schema (via MCP tool `outputSchema`)
+for `structuredContent`, treat that as the source of truth for the shape of the
+structured response.
+
 In that case, tool descriptions should:
 
 - Focus on **semantics** (what the tool _means_, not just what it accepts)
@@ -89,6 +93,7 @@ Tool descriptions should generally _not_:
 - Repeat every input parameter with its type/requiredness if the schema already
   documents it
 - Copy/paste the schema text into the tool description
+- Repeat full `structuredContent` shapes if the tool provides `outputSchema`
 
 **Best Practice Format:**
 
@@ -204,7 +209,48 @@ and format expectations where it is useful.
 
 ---
 
-## 5. Response Formatting
+## 5. Output Schema Best Practices
+
+### What Great Servers Do
+
+Provide `outputSchema` for tools so clients (and the server) can understand and
+validate the `structuredContent` return shape.
+
+Benefits:
+
+- Lets clients rely on schema instead of parsing markdown
+- Prevents drift between documented returns and actual payloads
+- Allows tool descriptions to focus on _behavior_ rather than re-describing data
+
+Example:
+
+```typescript
+server.registerTool(
+	'list_workshops',
+	{
+		inputSchema: listWorkshopsInputSchema,
+		outputSchema: z.object({
+			workshops: z.array(
+				z.object({
+					workshop: z.string(),
+					title: z.string(),
+					exerciseCount: z.number().int(),
+					hasDiffs: z.boolean(),
+				}),
+			),
+			nextCursor: z.string().optional(),
+		}),
+	},
+	async (args) => {
+		// ...
+		return { content: [...], structuredContent }
+	},
+)
+```
+
+---
+
+## 6. Response Formatting
 
 ### What Great Servers Do
 
@@ -256,7 +302,7 @@ machine-friendly data in `structuredContent`.
 
 ---
 
-## 6. Centralized Metadata
+## 7. Centralized Metadata
 
 ### What Great Servers Do
 
@@ -291,7 +337,7 @@ implementation consumes it.
 
 ---
 
-## 7. Tool Naming Conventions
+## 8. Tool Naming Conventions
 
 ### What Great Servers Do
 
@@ -316,7 +362,7 @@ conventions.
 
 ---
 
-## 8. Error Handling
+## 9. Error Handling
 
 ### What Great Servers Do
 
@@ -348,7 +394,7 @@ if (!feed) {
 
 ---
 
-## 9. Pagination & Limiting
+## 10. Pagination & Limiting
 
 ### What Great Servers Do
 
@@ -383,7 +429,7 @@ the next page.
 
 ---
 
-## 10. Resources Best Practices
+## 11. Resources Best Practices
 
 ### What Great Servers Do
 
@@ -405,7 +451,7 @@ patterns are recommended if/when resources are added.
 
 ---
 
-## 11. Prompts Best Practices
+## 12. Prompts Best Practices
 
 ### What Great Servers Do
 

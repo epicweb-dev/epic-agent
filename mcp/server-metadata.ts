@@ -1,4 +1,55 @@
+import { z } from 'zod'
 import { type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
+
+const workshopSummaryOutputSchema = z.object({
+	workshop: z.string(),
+	title: z.string(),
+	exerciseCount: z.number().int().nonnegative(),
+	hasDiffs: z.boolean(),
+	lastIndexedAt: z.string(),
+	product: z.string().optional(),
+})
+
+const retrievalSectionOutputSchema = z.object({
+	label: z.string(),
+	kind: z.string(),
+	content: z.string(),
+	sourcePath: z.string().optional(),
+	exerciseNumber: z.number().int().positive().optional(),
+	stepNumber: z.number().int().positive().optional(),
+})
+
+const topicMatchOutputSchema = z.object({
+	score: z.number(),
+	workshop: z.string(),
+	exerciseNumber: z.number().int().positive().optional(),
+	stepNumber: z.number().int().positive().optional(),
+	sectionKind: z.string().optional(),
+	sectionLabel: z.string().optional(),
+	sourcePath: z.string().optional(),
+	chunk: z.string(),
+	vectorId: z.string(),
+})
+
+const quizInstructionsOutputSchema = z.object({
+	tool: z.literal('retrieve_quiz_instructions'),
+	version: z.literal('1'),
+	topic: z.string().nullable(),
+	learnerGoal: z.string().nullable(),
+	targetQuestionCount: z.number().int().positive(),
+	instructionsMarkdown: z.string(),
+	checklist: z.array(z.string()),
+	questionTypes: z.array(
+		z.object({
+			id: z.string(),
+			label: z.string(),
+			promptTemplate: z.string(),
+			whatToListenFor: z.array(z.string()),
+			followUps: z.array(z.string()),
+		}),
+	),
+	closingSteps: z.array(z.string()),
+})
 
 export const serverMetadata = {
 	implementation: {
@@ -61,7 +112,9 @@ Behavior:
 - By default, this tool fetches all pages so callers get the full list.
 - Set { all: false } to paginate manually using { limit, cursor } and the returned nextCursor.
 
-Returns (structuredContent): { workshops: Array<{ workshop, title, product?, exerciseCount, hasDiffs, lastIndexedAt }>, nextCursor? }
+Returns:
+- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
+- structuredContent is validated and described by this tool's outputSchema.
 
 Examples:
 - "Show me everything" → {}
@@ -72,6 +125,10 @@ Next:
 - Use the returned 'workshop' slug with 'retrieve_learning_context', 'retrieve_diff_context', or 'search_topic_context'.
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
+		outputSchema: z.object({
+			workshops: z.array(workshopSummaryOutputSchema),
+			nextCursor: z.string().optional(),
+		}),
 	},
 
 	retrieve_learning_context: {
@@ -88,7 +145,9 @@ Behavior:
 - Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
 - Explicit scope is deterministic; random scope is not.
 
-Returns (structuredContent): { workshop, exerciseNumber, stepNumber?, sections[], truncated, nextCursor? }
+Returns:
+- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
+- structuredContent is validated and described by this tool's outputSchema.
 
 Examples:
 - "Get context for exercise 1" → { workshop: "mcp-fundamentals", exerciseNumber: 1 }
@@ -100,6 +159,14 @@ Next:
 - If you need where a topic is taught, call 'search_topic_context' with a query (and optional scope filters).
 		`.trim(),
 		annotations: nonDeterministicReadOnlyToolAnnotations,
+		outputSchema: z.object({
+			workshop: z.string(),
+			exerciseNumber: z.number().int().positive(),
+			stepNumber: z.number().int().positive().optional(),
+			sections: z.array(retrievalSectionOutputSchema),
+			truncated: z.boolean(),
+			nextCursor: z.string().optional(),
+		}),
 	},
 
 	retrieve_diff_context: {
@@ -112,7 +179,9 @@ Behavior:
 - Optional focus filtering is case-insensitive; whitespace-only focus values are treated as omitted.
 - Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
 
-Returns (structuredContent): { workshop, exerciseNumber, stepNumber?, diffSections[], truncated, nextCursor? }
+Returns:
+- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
+- structuredContent is validated and described by this tool's outputSchema.
 
 Examples:
 - "Get all diff context for step 1" → { workshop: "mcp-fundamentals", exerciseNumber: 1, stepNumber: 1 }
@@ -123,6 +192,14 @@ Next:
 - Pair with 'retrieve_learning_context' to get the surrounding non-diff context for the same scope.
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
+		outputSchema: z.object({
+			workshop: z.string(),
+			exerciseNumber: z.number().int().positive(),
+			stepNumber: z.number().int().positive().optional(),
+			diffSections: z.array(retrievalSectionOutputSchema),
+			truncated: z.boolean(),
+			nextCursor: z.string().optional(),
+		}),
 	},
 
 	search_topic_context: {
@@ -136,7 +213,9 @@ Behavior:
 - Falls back to keyword search when vector bindings are absent or when vector search fails.
 - If you provide stepNumber, you must also provide exerciseNumber.
 
-Returns (structuredContent): { query, limit, mode, vectorSearchAvailable, warnings?, matches[] }
+Returns:
+- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
+- structuredContent is validated and described by this tool's outputSchema.
 
 Examples:
 - "Find closures" → { query: "closures" }
@@ -147,6 +226,15 @@ Next:
 - Use the returned scope metadata (workshop/exercise/step) to call 'retrieve_learning_context' or 'retrieve_diff_context'.
 		`.trim(),
 		annotations: openWorldReadOnlyToolAnnotations,
+		outputSchema: z.object({
+			query: z.string(),
+			limit: z.number().int().positive(),
+			mode: z.enum(['vector', 'keyword']),
+			vectorSearchAvailable: z.boolean(),
+			keywordSource: z.enum(['chunks', 'sections']).nullable(),
+			warnings: z.array(z.string()).optional(),
+			matches: z.array(topicMatchOutputSchema),
+		}),
 	},
 
 	retrieve_quiz_instructions: {
@@ -159,7 +247,9 @@ Use this tool when:
 - The learner asks to be quizzed.
 - You want to solidify understanding with retrieval practice.
 
-Returns (structuredContent): { tool, version, topic, learnerGoal, targetQuestionCount, instructionsMarkdown, checklist, questionTypes, closingSteps }
+Returns:
+- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
+- structuredContent is validated and described by this tool's outputSchema.
 
 Examples:
 - "Quiz me on closures" → { topic: "JavaScript closures" }
@@ -170,5 +260,6 @@ Next:
 - Pair with 'retrieve_learning_context' or 'search_topic_context' to gather source material for questions.
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
+		outputSchema: quizInstructionsOutputSchema,
 	},
 } as const

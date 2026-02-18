@@ -132,6 +132,7 @@ export async function registerTools(agent: MCP) {
 			description: toolsMetadata.list_workshops.description,
 			inputSchema: listWorkshopsInputSchema,
 			annotations: toolsMetadata.list_workshops.annotations,
+			outputSchema: toolsMetadata.list_workshops.outputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = z.object(listWorkshopsInputSchema).safeParse(rawArgs)
@@ -220,6 +221,7 @@ export async function registerTools(agent: MCP) {
 			description: toolsMetadata.retrieve_learning_context.description,
 			inputSchema: retrieveLearningContextInputSchema,
 			annotations: toolsMetadata.retrieve_learning_context.annotations,
+			outputSchema: toolsMetadata.retrieve_learning_context.outputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = retrieveLearningContextInputSchema.safeParse(rawArgs)
@@ -288,6 +290,7 @@ export async function registerTools(agent: MCP) {
 			description: toolsMetadata.retrieve_diff_context.description,
 			inputSchema: retrieveDiffContextInputSchema,
 			annotations: toolsMetadata.retrieve_diff_context.annotations,
+			outputSchema: toolsMetadata.retrieve_diff_context.outputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = z.object(retrieveDiffContextInputSchema).safeParse(rawArgs)
@@ -365,6 +368,7 @@ export async function registerTools(agent: MCP) {
 			description: toolsMetadata.search_topic_context.description,
 			inputSchema: searchTopicContextInputSchema,
 			annotations: toolsMetadata.search_topic_context.annotations,
+			outputSchema: toolsMetadata.search_topic_context.outputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = z.object(searchTopicContextInputSchema).safeParse(rawArgs)
@@ -463,6 +467,7 @@ export async function registerTools(agent: MCP) {
 			description: toolsMetadata.retrieve_quiz_instructions.description,
 			inputSchema: retrieveQuizInstructionsInputSchema,
 			annotations: toolsMetadata.retrieve_quiz_instructions.annotations,
+			outputSchema: toolsMetadata.retrieve_quiz_instructions.outputSchema,
 		},
 		async (rawArgs: unknown) => {
 			const args = retrieveQuizInstructionsInputSchema.safeParse(rawArgs ?? {})
