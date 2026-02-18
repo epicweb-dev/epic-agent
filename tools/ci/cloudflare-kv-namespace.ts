@@ -219,9 +219,11 @@ async function main() {
 
 	if (action === 'lookup') {
 		const id = await resolveNamespaceIdByTitle({ apiToken, accountId, title })
-		if (id) {
-			console.log(id)
+		if (!id) {
+			console.error(`KV namespace not found: ${title}`)
+			process.exit(1)
 		}
+		console.log(id)
 		return
 	}
 

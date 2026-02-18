@@ -18,7 +18,7 @@ fi
 
 trimmed="$(echo "$base" | cut -c1-"$base_max_len" | sed -E 's/-+$//')"
 if [ -z "$trimmed" ]; then
-  trimmed="preview"
+  trimmed="$(echo "preview" | cut -c1-"$base_max_len")"
 fi
 
 echo "${trimmed}${suffix}"

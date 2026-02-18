@@ -96,13 +96,12 @@ async function waitForMockServer(
 }
 
 async function stopProcess(proc: ReturnType<typeof Bun.spawn>) {
-	let exited = false
-	void proc.exited.then(() => {
-		exited = true
-	})
 	proc.kill('SIGINT')
-	await Promise.race([proc.exited, delay(5_000)])
-	if (!exited) {
+	const result = await Promise.race([
+		proc.exited.then(() => 'exited' as const),
+		delay(5_000).then(() => 'timeout' as const),
+	])
+	if (result === 'timeout') {
 		proc.kill('SIGKILL')
 		await proc.exited
 	}

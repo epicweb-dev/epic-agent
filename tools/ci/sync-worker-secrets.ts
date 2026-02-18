@@ -148,7 +148,39 @@ function parseDotenv(content: string) {
 		const equalsIndex = withoutExport.indexOf('=')
 		if (equalsIndex <= 0) continue
 		const key = withoutExport.slice(0, equalsIndex).trim()
-		const value = stripQuotes(withoutExport.slice(equalsIndex + 1))
+		const rawRhs = withoutExport.slice(equalsIndex + 1).trim()
+		let value = rawRhs
+		const firstChar = rawRhs[0]
+		if (firstChar === '"' || firstChar === "'") {
+			// Support `KEY="value" # comment` by scanning for the closing quote.
+			const quote = firstChar
+			let endIndex = -1
+			let escaped = false
+			for (let i = 1; i < rawRhs.length; i += 1) {
+				const char = rawRhs[i]
+				if (quote === '"' && !escaped && char === '\\') {
+					escaped = true
+					continue
+				}
+				if (!escaped && char === quote) {
+					endIndex = i
+					break
+				}
+				escaped = false
+			}
+			value =
+				endIndex >= 0
+					? stripQuotes(rawRhs.slice(0, endIndex + 1))
+					: stripQuotes(rawRhs)
+		} else {
+			// Strip inline comments like `KEY=value # comment` (but keep `foo#bar`).
+			const inlineCommentIndex = rawRhs.search(/\s#/)
+			value = stripQuotes(
+				inlineCommentIndex >= 0
+					? rawRhs.slice(0, inlineCommentIndex).trimEnd()
+					: rawRhs,
+			)
+		}
 		if (!key) continue
 		result.set(key, value)
 	}

@@ -125,7 +125,7 @@ jobs:
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
               "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain"
           )"
-          subdomain="$(node -e "const data = JSON.parse(process.env.RESPONSE ?? '{}'); const sd = data?.result?.subdomain; process.stdout.write(typeof sd === 'string' ? sd : '')" RESPONSE="$response")"
+          subdomain="$(RESPONSE="$response" node -e "const data = JSON.parse(process.env.RESPONSE ?? '{}'); const sd = data?.result?.subdomain; process.stdout.write(typeof sd === 'string' ? sd : '')")"
           if [ -z "$subdomain" ]; then
             exit 0
           fi
