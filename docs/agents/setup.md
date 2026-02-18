@@ -15,6 +15,8 @@ Quick notes for getting a local epic-agent environment running.
 
 - Copy `.env.test` to `.env` before starting any work, then update secrets as
   needed.
+- `.env.example` is a safe, committed template used by GitHub Actions preview
+  deployments when syncing Cloudflare Worker secrets.
 - `bun run dev` (starts mock API servers automatically and sets
   `RESEND_API_BASE_URL` to the local mock host).
 - To trigger workshop indexing manually in local/dev environments:
@@ -55,6 +57,14 @@ Quick notes for getting a local epic-agent environment running.
 When running Wrangler remote commands with `CLOUDFLARE_API_TOKEN`, also set
 `CLOUDFLARE_ACCOUNT_ID` explicitly. CI also uses it to compute workers.dev
 preview URLs.
+
+## CI preview deploy resources
+
+- PR preview deployments provision isolated Cloudflare resources per preview:
+  - a dedicated D1 database
+  - a dedicated KV namespace for `OAUTH_KV`
+- The preview cleanup workflow deletes the preview Workers and these resources
+  when the PR closes.
 
 How to find `CLOUDFLARE_ACCOUNT_ID`:
 

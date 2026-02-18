@@ -1,0 +1,40 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "epic-agent-mock-resend",
+	"compatibility_date": "2026-01-31",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"main": "./worker.ts",
+	"observability": { "enabled": true },
+	"env": {
+		"production": {
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent",
+					"database_id": "e4d0cda7-96f9-4788-be84-ea5b6ff35545",
+					"migrations_dir": "../../migrations",
+				},
+			],
+		},
+		"preview": {
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent-preview",
+					"database_id": "28ca4a48-93a9-44de-9395-03fbbdf237ea",
+					"migrations_dir": "../../migrations",
+				},
+			],
+		},
+		"test": {
+			"d1_databases": [
+				{
+					"binding": "APP_DB",
+					"database_name": "epic-agent-preview",
+					"database_id": "28ca4a48-93a9-44de-9395-03fbbdf237ea",
+					"migrations_dir": "../../migrations",
+				},
+			],
+		},
+	},
+}
