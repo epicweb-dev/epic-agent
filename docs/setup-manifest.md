@@ -115,8 +115,8 @@ To load workshop content into D1 + Vectorize from CI, run the
 - workflow summary output includes the generated reindex run id for easier log
   correlation (`workshop_index_runs.id`)
 
-To keep indexed workshop content fresh automatically, CI also runs the `Nightly
-Workshop Reindex` workflow (`schedule`, production only). It:
+To keep indexed workshop content fresh automatically, CI also runs the
+`Nightly Workshop Reindex` workflow (`schedule`, production only). It:
 
 - runs daily at `10:00 UTC` (roughly `03:00` Mountain Standard Time)
 - discovers workshop repositories via GitHub Search (same as the manual job)

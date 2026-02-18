@@ -20,5 +20,5 @@ This folder documents the important runtime architecture for `epic-agent`.
 - Router and HTTP route mapping: `server/router.ts` and `server/routes.ts`
 - OAuth handlers: `worker/oauth-handlers.ts`
 - MCP auth checks: `worker/mcp-auth.ts`
-- MCP tool registration: `mcp/tools.ts`
-  - includes workshop listing/context/diff retrieval and vector topic search
+- MCP tool registration: `mcp/register-tools.ts`
+  - tool implementations live in `mcp/tools/*.ts`

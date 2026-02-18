@@ -4,14 +4,28 @@ export const maxQuizQuestionCount = 20
 export const defaultQuizQuestionCount = 8
 
 export const retrieveQuizInstructionsInputSchema = z.object({
-	topic: z.string().trim().min(1).optional(),
-	learnerGoal: z.string().trim().min(1).optional(),
+	topic: z
+		.string()
+		.trim()
+		.min(1)
+		.optional()
+		.describe('Optional topic label to include in the quiz protocol.'),
+	learnerGoal: z
+		.string()
+		.trim()
+		.min(1)
+		.optional()
+		.describe('Optional learner goal to tailor the quiz protocol.'),
 	questionCount: z.coerce
 		.number()
 		.int()
 		.positive()
 		.max(maxQuizQuestionCount)
-		.optional(),
+		.optional()
+		.default(defaultQuizQuestionCount)
+		.describe(
+			`Target number of questions (1-${maxQuizQuestionCount}, default: ${defaultQuizQuestionCount}).`,
+		),
 })
 
 export type RetrieveQuizInstructionsInput = z.infer<

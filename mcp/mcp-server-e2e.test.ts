@@ -758,14 +758,19 @@ test(
 		await using server = await startDevServer(database.persistDir)
 		await using mcpClient = await createMcpClient(server.origin, database.user)
 
+		const instructions = mcpClient.client.getInstructions() ?? ''
+		expect(instructions).toContain('Quick start')
+
 		const result = await mcpClient.client.listTools()
 		const toolNames = result.tools.map((tool) => tool.name)
 
-		expect(toolNames).toContain('list_workshops')
-		expect(toolNames).toContain('retrieve_learning_context')
-		expect(toolNames).toContain('retrieve_diff_context')
-		expect(toolNames).toContain('search_topic_context')
-		expect(toolNames).toContain('retrieve_quiz_instructions')
+		expect(toolNames.sort()).toEqual([
+			'list_workshops',
+			'retrieve_diff_context',
+			'retrieve_learning_context',
+			'retrieve_quiz_instructions',
+			'search_topic_context',
+		])
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -828,9 +833,10 @@ test(
 			},
 		})
 
-		const textOutput = getTextResultContent(result as CallToolResult)
-
-		expect(textOutput).toContain('"workshops"')
+		const structuredResult = (result as CallToolResult).structuredContent as
+			| { workshops?: Array<unknown> }
+			| undefined
+		expect(Array.isArray(structuredResult?.workshops)).toBe(true)
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -849,9 +855,19 @@ test(
 				limit: 5,
 			},
 		})
-		const listOutput = getTextResultContent(listResult as CallToolResult)
-		expect(listOutput).toContain('mcp-fundamentals')
-		expect(listOutput).toContain('"exerciseCount": 1')
+		const listStructured = (listResult as CallToolResult).structuredContent as
+			| { workshops?: Array<{ workshop: string; exerciseCount: number }> }
+			| undefined
+		expect(
+			listStructured?.workshops?.some(
+				(workshop) => workshop.workshop === 'mcp-fundamentals',
+			),
+		).toBe(true)
+		expect(
+			listStructured?.workshops?.find(
+				(workshop) => workshop.workshop === 'mcp-fundamentals',
+			)?.exerciseCount,
+		).toBe(1)
 
 		const learningResult = await mcpClient.client.callTool({
 			name: 'retrieve_learning_context',
@@ -862,15 +878,12 @@ test(
 				maxChars: 35,
 			},
 		})
-		const learningOutput = getTextResultContent(
-			learningResult as CallToolResult,
-		)
-		expect(learningOutput).toContain('"truncated": true')
-		expect(learningOutput).toContain('"nextCursor"')
-		const parsedLearningOutput = JSON.parse(learningOutput) as {
-			nextCursor?: string
-		}
-		expect(typeof parsedLearningOutput.nextCursor).toBe('string')
+		const learningStructured = (learningResult as CallToolResult)
+			.structuredContent as
+			| { nextCursor?: string; truncated?: boolean }
+			| undefined
+		expect(learningStructured?.truncated).toBe(true)
+		expect(typeof learningStructured?.nextCursor).toBe('string')
 
 		const learningContinuation = await mcpClient.client.callTool({
 			name: 'retrieve_learning_context',
@@ -879,24 +892,24 @@ test(
 				exerciseNumber: 1,
 				stepNumber: 1,
 				maxChars: 35,
-				cursor: parsedLearningOutput.nextCursor,
+				cursor: learningStructured?.nextCursor,
 			},
 		})
-		const continuationOutput = getTextResultContent(
-			learningContinuation as CallToolResult,
-		)
-		const parsedContinuationOutput = JSON.parse(continuationOutput) as {
-			sections: Array<{ label: string; content: string }>
-			truncated: boolean
-		}
-		expect(parsedContinuationOutput.truncated).toBe(true)
-		expect(parsedContinuationOutput.sections.length).toBeGreaterThan(0)
-		expect(parsedContinuationOutput.sections[0]?.label).toBe(
+		const continuationStructured = (learningContinuation as CallToolResult)
+			.structuredContent as
+			| {
+					sections: Array<{ label: string; content: string }>
+					truncated: boolean
+			  }
+			| undefined
+		expect(continuationStructured?.truncated).toBe(true)
+		expect(continuationStructured?.sections.length).toBeGreaterThan(0)
+		expect(continuationStructured?.sections[0]?.label).toBe(
 			'Problem instructions',
 		)
-		expect(
-			parsedContinuationOutput.sections[0]?.content.length,
-		).toBeGreaterThan(0)
+		expect(continuationStructured?.sections[0]?.content.length).toBeGreaterThan(
+			0,
+		)
 
 		const diffResult = await mcpClient.client.callTool({
 			name: 'retrieve_diff_context',
@@ -906,9 +919,14 @@ test(
 				stepNumber: 1,
 			},
 		})
-		const diffOutput = getTextResultContent(diffResult as CallToolResult)
-		expect(diffOutput).toContain('"diffSections"')
-		expect(diffOutput).toContain('diff --git a/src/index.ts b/src/index.ts')
+		const diffStructured = (diffResult as CallToolResult).structuredContent as
+			| { diffSections?: Array<{ content: string }> }
+			| undefined
+		expect(
+			diffStructured?.diffSections?.some((section) =>
+				section.content.includes('diff --git a/src/index.ts b/src/index.ts'),
+			),
+		).toBe(true)
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -929,33 +947,28 @@ test(
 				limit: 1,
 			},
 		})
-		const firstPageOutput = getTextResultContent(
-			firstPageResult as CallToolResult,
-		)
-		const parsedFirstPage = JSON.parse(firstPageOutput) as {
-			workshops: Array<{ workshop: string }>
-			nextCursor?: string
-		}
-		expect(parsedFirstPage.workshops.length).toBe(1)
-		expect(typeof parsedFirstPage.nextCursor).toBe('string')
+		const firstPageStructured = (firstPageResult as CallToolResult)
+			.structuredContent as
+			| { workshops: Array<{ workshop: string }>; nextCursor?: string }
+			| undefined
+		expect(firstPageStructured?.workshops.length).toBe(1)
+		expect(typeof firstPageStructured?.nextCursor).toBe('string')
 
 		const secondPageResult = await mcpClient.client.callTool({
 			name: 'list_workshops',
 			arguments: {
 				all: false,
 				limit: 1,
-				cursor: parsedFirstPage.nextCursor,
+				cursor: firstPageStructured?.nextCursor,
 			},
 		})
-		const secondPageOutput = getTextResultContent(
-			secondPageResult as CallToolResult,
-		)
-		const parsedSecondPage = JSON.parse(secondPageOutput) as {
-			workshops: Array<{ workshop: string }>
-		}
-		expect(parsedSecondPage.workshops.length).toBe(1)
-		expect(parsedSecondPage.workshops[0]?.workshop).not.toBe(
-			parsedFirstPage.workshops[0]?.workshop,
+		const secondPageStructured = (secondPageResult as CallToolResult)
+			.structuredContent as
+			| { workshops: Array<{ workshop: string }>; nextCursor?: string }
+			| undefined
+		expect(secondPageStructured?.workshops.length).toBe(1)
+		expect(secondPageStructured?.workshops[0]?.workshop).not.toBe(
+			firstPageStructured?.workshops[0]?.workshop,
 		)
 
 		const noDiffResult = await mcpClient.client.callTool({
@@ -964,9 +977,20 @@ test(
 				hasDiffs: false,
 			},
 		})
-		const noDiffOutput = getTextResultContent(noDiffResult as CallToolResult)
-		expect(noDiffOutput).toContain('advanced-typescript')
-		expect(noDiffOutput).not.toContain('mcp-fundamentals')
+		const noDiffStructured = (noDiffResult as CallToolResult)
+			.structuredContent as
+			| { workshops?: Array<{ workshop: string }> }
+			| undefined
+		expect(
+			noDiffStructured?.workshops?.some(
+				(workshop) => workshop.workshop === 'advanced-typescript',
+			),
+		).toBe(true)
+		expect(
+			noDiffStructured?.workshops?.some(
+				(workshop) => workshop.workshop === 'mcp-fundamentals',
+			),
+		).toBe(false)
 
 		const randomResult = await mcpClient.client.callTool({
 			name: 'retrieve_learning_context',
@@ -975,17 +999,25 @@ test(
 				maxChars: 300,
 			},
 		})
-		const randomOutput = getTextResultContent(randomResult as CallToolResult)
-		const parsedRandomOutput = JSON.parse(randomOutput) as {
-			workshop: string
-			exerciseNumber: number
-			sections: Array<{ label: string }>
+		const randomStructured = (randomResult as CallToolResult)
+			.structuredContent as
+			| {
+					workshop: string
+					exerciseNumber: number
+					sections: Array<{ label: string }>
+			  }
+			| undefined
+		expect(randomStructured).toBeTruthy()
+		if (!randomStructured) {
+			throw new Error(
+				'Expected structuredContent from retrieve_learning_context',
+			)
 		}
 		expect(['advanced-typescript', 'mcp-fundamentals']).toContain(
-			parsedRandomOutput.workshop,
+			randomStructured.workshop,
 		)
-		expect(parsedRandomOutput.exerciseNumber).toBe(1)
-		expect(parsedRandomOutput.sections.length).toBeGreaterThan(0)
+		expect(randomStructured.exerciseNumber).toBe(1)
+		expect(randomStructured.sections.length).toBeGreaterThan(0)
 	},
 	{ timeout: defaultTimeoutMs },
 )
@@ -1007,13 +1039,13 @@ test(
 				focus: 'SRC/INDEX.TS',
 			},
 		})
-		const focusedOutput = getTextResultContent(focusedResult as CallToolResult)
-		const focusedPayload = JSON.parse(focusedOutput) as {
-			diffSections: Array<{ sourcePath?: string; content: string }>
-		}
-		expect(focusedPayload.diffSections.length).toBeGreaterThan(0)
+		const focusedPayload = (focusedResult as CallToolResult)
+			.structuredContent as
+			| { diffSections: Array<{ sourcePath?: string; content: string }> }
+			| undefined
+		expect(focusedPayload?.diffSections.length).toBeGreaterThan(0)
 		expect(
-			focusedPayload.diffSections.some((section) =>
+			focusedPayload?.diffSections.some((section) =>
 				(section.sourcePath ?? '').toLowerCase().includes('src/index.ts'),
 			),
 		).toBe(true)
@@ -1078,18 +1110,18 @@ test(
 				query: 'model context protocol',
 			},
 		})
-
-		const textOutput = getTextResultContent(result as CallToolResult)
-		const payload = JSON.parse(textOutput) as {
-			mode?: string
-			vectorSearchAvailable?: boolean
-			warnings?: Array<string>
-			matches?: Array<unknown>
-		}
-		expect(payload.mode).toBe('keyword')
-		expect(payload.vectorSearchAvailable).toBe(false)
-		expect(Array.isArray(payload.warnings)).toBe(true)
-		expect(Array.isArray(payload.matches)).toBe(true)
+		const payload = (result as CallToolResult).structuredContent as
+			| {
+					mode?: string
+					vectorSearchAvailable?: boolean
+					warnings?: Array<string>
+					matches?: Array<unknown>
+			  }
+			| undefined
+		expect(payload?.mode).toBe('keyword')
+		expect(payload?.vectorSearchAvailable).toBe(false)
+		expect(Array.isArray(payload?.warnings)).toBe(true)
+		expect(Array.isArray(payload?.matches)).toBe(true)
 	},
 	{ timeout: defaultTimeoutMs },
 )

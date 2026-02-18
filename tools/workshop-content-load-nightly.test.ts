@@ -45,4 +45,3 @@ test('diffIncludesWorkshopContent matches compare diff headers', () => {
 		),
 	).toBe(false)
 })
-
