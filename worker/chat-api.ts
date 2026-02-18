@@ -242,8 +242,17 @@ export async function handleChatTurnRequest({
 	const body = (await request.json().catch(() => null)) as unknown
 	const parsed = chatTurnRequestSchema.safeParse(body)
 	if (!parsed.success) {
+		// Keep schema details out of the client response to avoid coupling/error
+		// disclosure; log a minimal shape for debugging.
+		console.warn('chat-turn-invalid-request', {
+			issues: parsed.error.issues.map((issue) => ({
+				code: issue.code,
+				message: issue.message,
+				path: issue.path,
+			})),
+		})
 		return jsonResponse(
-			{ ok: false, error: `Invalid request: ${parsed.error.message}` },
+			{ ok: false, error: 'Invalid request body.' },
 			{ status: 400 },
 		)
 	}
