@@ -326,7 +326,11 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 					{
 						displayMessage: 'Chat turn: list tools',
 						id: crypto.randomUUID(),
-						payload: { event: 'chat:turn', durationMs: Date.now() - start },
+						payload: {
+							method: 'chat:turn:list-tools',
+							streaming: false,
+							durationMs: Date.now() - start,
+						},
 						timestamp: Date.now(),
 						type: 'rpc',
 					},
@@ -363,7 +367,8 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 					displayMessage: `Chat turn: tool ${plan.toolName}`,
 					id: crypto.randomUUID(),
 					payload: {
-						event: 'chat:turn',
+						method: 'chat:turn:call-tool',
+						streaming: false,
 						durationMs: Date.now() - start,
 						toolName: plan.toolName,
 					},
