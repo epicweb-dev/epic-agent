@@ -132,8 +132,9 @@ Returns: { items: Array<{ id, summary, start, end, calendarId, calendarName... }
 Next: Use eventId AND calendarId with 'update_event' or 'delete_event'.
 ```
 
-**Example in this repo:** Tool descriptions follow the structured format (what
-it does, inputs/returns, examples, and "next steps").
+**Example in this repo:** Tool descriptions focus on use cases and semantics,
+while input/output schemas describe parameter and structured output shapes.
+Navigation guidance (cursors, next steps) lives in the tool outputs.
 
 ---
 
