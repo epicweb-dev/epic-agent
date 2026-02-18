@@ -17,7 +17,7 @@ export const chatTurnPath = '/chat/turn'
 
 const chatTurnRequestSchema = z.object({
 	message: z.string().trim().min(1).max(10_000),
-	mcpSessionId: z.string().trim().min(1).optional(),
+	mcpSessionId: z.string().trim().min(1).nullable().optional(),
 })
 
 type ToolCallPlan =
@@ -235,7 +235,7 @@ export async function handleChatTurnRequest({
 			request,
 			env,
 			ctx,
-			mcpSessionId: parsed.data.mcpSessionId,
+			mcpSessionId: parsed.data.mcpSessionId ?? undefined,
 		})
 
 		try {

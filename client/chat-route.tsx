@@ -106,7 +106,10 @@ function ChatPage(handle: Handle) {
 					'Content-Type': 'application/json',
 				},
 				credentials: 'include',
-				body: JSON.stringify({ message: userText, mcpSessionId }),
+				body: JSON.stringify({
+					message: userText,
+					mcpSessionId: mcpSessionId ?? undefined,
+				}),
 			})
 			const payload = (await response.json().catch(() => null)) as
 				| ChatTurnResponse
