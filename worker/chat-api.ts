@@ -1,4 +1,7 @@
-import { readAuthSession, setAuthSessionSecret } from '../server/auth-session.ts'
+import {
+	readAuthSession,
+	setAuthSessionSecret,
+} from '../server/auth-session.ts'
 import { getEnv } from '../server/env.ts'
 
 export const chatTurnPath = '/chat/turn'
@@ -38,4 +41,3 @@ export async function handleChatTurnRequest({
 	const chatAgentId = env.CHAT_AGENT.idFromName(session.id)
 	return env.CHAT_AGENT.get(chatAgentId).fetch(request)
 }
-

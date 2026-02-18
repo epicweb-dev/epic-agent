@@ -34,8 +34,8 @@ type ToolCallPlan =
 			toolArguments: Record<string, unknown>
 	  }
 
-type ExecutionContextWithProps<TProps> = ExecutionContext & { props?: TProps }
 type McpContextProps = { baseUrl: string }
+type McpExecutionContext = ExecutionContext<McpContextProps>
 
 type McpConnection = {
 	client: Client
@@ -166,12 +166,15 @@ async function raceWithTimeout<T>({
 }
 
 function createMcpExecutionContext(
-	ctx: DurableObjectState,
+	ctx: { waitUntil: (promise: Promise<unknown>) => void },
 	baseUrl: string,
-): ExecutionContextWithProps<McpContextProps> {
+): McpExecutionContext {
 	return {
 		waitUntil: (promise) => ctx.waitUntil(promise),
 		passThroughOnException: () => {},
+		// The MCP handler requires an ExecutionContext, but for Durable Object -> DO
+		// internal calls we only rely on waitUntil + props. Exports are unused here.
+		exports: {} as unknown as Cloudflare.Exports,
 		props: { baseUrl },
 	}
 }
@@ -207,7 +210,12 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
 		this.mcpConnectionPromise = (async () => {
 			const serverUrl = new URL(mcpResourcePath, origin)
-			const mcpCtx = createMcpExecutionContext(this.ctx, origin)
+			const mcpCtx = createMcpExecutionContext(
+				this.ctx as unknown as {
+					waitUntil: (promise: Promise<unknown>) => void
+				},
+				origin,
+			)
 
 			const transport = new StreamableHTTPClientTransport(serverUrl, {
 				fetch: (input, init) => {
@@ -318,9 +326,9 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 					{
 						displayMessage: 'Chat turn: list tools',
 						id: crypto.randomUUID(),
-						payload: { durationMs: Date.now() - start },
+						payload: { event: 'chat:turn', durationMs: Date.now() - start },
 						timestamp: Date.now(),
-						type: 'chat:turn',
+						type: 'rpc',
 					},
 					this.ctx,
 				)
@@ -355,11 +363,12 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 					displayMessage: `Chat turn: tool ${plan.toolName}`,
 					id: crypto.randomUUID(),
 					payload: {
+						event: 'chat:turn',
 						durationMs: Date.now() - start,
 						toolName: plan.toolName,
 					},
 					timestamp: Date.now(),
-					type: 'chat:turn',
+					type: 'rpc',
 				},
 				this.ctx,
 			)
