@@ -9,6 +9,10 @@
 			"new_sqlite_classes": ["MCP"],
 			"tag": "v1",
 		},
+		{
+			"new_sqlite_classes": ["ChatAgent"],
+			"tag": "v2",
+		},
 	],
 
 	"observability": {
@@ -32,6 +36,10 @@
 					{
 						"class_name": "MCP",
 						"name": "MCP_OBJECT",
+					},
+					{
+						"class_name": "ChatAgent",
+						"name": "ChatAgent",
 					},
 				],
 			},
@@ -69,6 +77,10 @@
 						"class_name": "MCP",
 						"name": "MCP_OBJECT",
 					},
+					{
+						"class_name": "ChatAgent",
+						"name": "ChatAgent",
+					},
 				],
 			},
 			"d1_databases": [
@@ -98,6 +110,10 @@
 					{
 						"class_name": "MCP",
 						"name": "MCP_OBJECT",
+					},
+					{
+						"class_name": "ChatAgent",
+						"name": "ChatAgent",
 					},
 				],
 			},

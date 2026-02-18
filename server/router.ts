@@ -4,6 +4,7 @@ import account from './handlers/account.ts'
 import { createAuthHandler } from './handlers/auth.ts'
 import health from './handlers/health.ts'
 import home from './handlers/home.ts'
+import chat from './handlers/chat.ts'
 import login from './handlers/login.ts'
 import logout from './handlers/logout.ts'
 import {
@@ -25,6 +26,7 @@ export function createAppRouter(appEnv: AppEnv) {
 	})
 
 	router.map(routes.home, home)
+	router.map(routes.chat, chat)
 	router.map(routes.health, health)
 	router.map(routes.login, login)
 	router.map(routes.signup, signup)

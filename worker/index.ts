@@ -1,6 +1,8 @@
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider'
+import { routeAgentRequest } from 'agents'
 import { MCP } from '../mcp/index.ts'
 import { handleRequest } from '../server/handler.ts'
+import { ChatAgent } from './chat-agent.ts'
 import {
 	apiHandler,
 	handleAuthorizeRequest,
@@ -17,9 +19,10 @@ import {
 } from './mcp-auth.ts'
 import { withCors } from './utils.ts'
 
-export { MCP }
+export { ChatAgent, MCP }
 
 const disabledWorkshopIndexRoutePath = '/internal/workshop-index/reindex'
+const chatAgentRoutePrefix = '/agents/chat-agent'
 
 const appHandler = withCors({
 	getCorsHeaders(request) {
@@ -36,6 +39,19 @@ const appHandler = withCors({
 	},
 	async handler(request, env, ctx) {
 		const url = new URL(request.url)
+
+		if (url.pathname.startsWith('/agents/')) {
+			if (
+				url.pathname === chatAgentRoutePrefix ||
+				url.pathname.startsWith(`${chatAgentRoutePrefix}/`)
+			) {
+				return (
+					(await routeAgentRequest(request, env)) ||
+					new Response('Not found', { status: 404 })
+				)
+			}
+			return new Response('Not found', { status: 404 })
+		}
 
 		if (url.pathname === oauthPaths.authorize) {
 			return handleAuthorizeRequest(request, env)
