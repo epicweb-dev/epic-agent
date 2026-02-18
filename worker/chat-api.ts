@@ -277,7 +277,11 @@ export async function handleChatTurnRequest({
 				mcpSessionId: mcp.transport.sessionId ?? null,
 			})
 		} finally {
-			await mcp.close()
+			try {
+				await mcp.close()
+			} catch (error) {
+				console.warn('Failed to close MCP client', error)
+			}
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
