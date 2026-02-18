@@ -82,11 +82,12 @@ structured response.
 In that case, tool descriptions should:
 
 - Focus on **semantics** (what the tool _means_, not just what it accepts)
+- Focus on **use cases** (when to call the tool)
 - Call out **cross-field constraints** the schema may not capture well (for
   example: "if you pass `stepNumber`, you must also pass `exerciseNumber`")
 - Call out **defaults** and **server-side behavior** (pagination, truncation,
   fallbacks) that are easy to miss
-- Include **returns**, **examples**, and **next-step chaining**
+- Include **examples** when they clarify intent
 
 Tool descriptions should generally _not_:
 
@@ -94,6 +95,9 @@ Tool descriptions should generally _not_:
   documents it
 - Copy/paste the schema text into the tool description
 - Repeat full `structuredContent` shapes if the tool provides `outputSchema`
+- Over-index on "what to call next"; navigation belongs in tool outputs (for
+  example, `nextCursor` fields and explicit next-step hints in the returned
+  markdown)
 
 **Best Practice Format:**
 
@@ -104,13 +108,12 @@ Inputs:
 - See the input schema for parameter-level details.
 - Call out only non-obvious constraints and defaults here.
 
-Returns: { field1, field2, ... }
-
 Examples:
 - "Do X" → { param: "value" }
 - "Do Y" → { param: "other" }
 
-Next: Use tool_a to verify. Pass id to tool_b.
+Navigation:
+- Prefer returning next steps in tool outputs (for example: cursors and explicit next-step hints in markdown).
 ```
 
 **Example from Google Calendar:**

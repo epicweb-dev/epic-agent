@@ -108,21 +108,10 @@ export const toolsMetadata = {
 		description: `
 List indexed workshops and metadata coverage.
 
-Behavior:
-- By default, this tool fetches all pages so callers get the full list.
-- Set { all: false } to paginate manually using { limit, cursor } and the returned nextCursor.
-
-Returns:
-- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
-- structuredContent is validated and described by this tool's outputSchema.
-
-Examples:
-- "Show me everything" → {}
-- "Fetch 1 page at a time" → { all: false, limit: 20 }
-- "Only workshops with diffs" → { hasDiffs: true }
-
-Next:
-- Use the returned 'workshop' slug with 'retrieve_learning_context', 'retrieve_diff_context', or 'search_topic_context'.
+Use when:
+- You need valid workshop slugs to scope other tools.
+- You want to filter by product or diff availability.
+- You want to inspect indexing coverage (exercise counts, last indexed time).
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
 		outputSchema: z.object({
@@ -137,26 +126,10 @@ Next:
 		description: `
 Retrieve indexed workshop context sections for quiz authoring.
 
-Modes:
-- Explicit scope: provide { workshop, exerciseNumber, stepNumber? }
-- Random scope: provide { random: true } (non-deterministic)
-
-Behavior:
-- Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
-- Explicit scope is deterministic; random scope is not.
-
-Returns:
-- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
-- structuredContent is validated and described by this tool's outputSchema.
-
-Examples:
-- "Get context for exercise 1" → { workshop: "mcp-fundamentals", exerciseNumber: 1 }
-- "Pick a random exercise" → { random: true }
-- "Continue after truncation" → { workshop: "...", exerciseNumber: 1, cursor: "<nextCursor>" }
-
-Next:
-- If you need code-change context, call 'retrieve_diff_context' for the same scope.
-- If you need where a topic is taught, call 'search_topic_context' with a query (and optional scope filters).
+Use when:
+- You need source material to create questions or explanations for a specific scope.
+- You want a random indexed scope to practice or sample.
+- You need to page through large contexts using cursors.
 		`.trim(),
 		annotations: nonDeterministicReadOnlyToolAnnotations,
 		outputSchema: z.object({
@@ -175,21 +148,10 @@ Next:
 		description: `
 Retrieve diff-focused context sections for a scoped workshop exercise/step.
 
-Behavior:
-- Optional focus filtering is case-insensitive; whitespace-only focus values are treated as omitted.
-- Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
-
-Returns:
-- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
-- structuredContent is validated and described by this tool's outputSchema.
-
-Examples:
-- "Get all diff context for step 1" → { workshop: "mcp-fundamentals", exerciseNumber: 1, stepNumber: 1 }
-- "Focus on a file" → { workshop: "...", exerciseNumber: 1, stepNumber: 1, focus: "src/index.ts" }
-
-Next:
-- If focus yields no matches, adjust focus or omit it to see the full diff context.
-- Pair with 'retrieve_learning_context' to get the surrounding non-diff context for the same scope.
+Use when:
+- You need code-change context for an exercise or step.
+- You want to narrow down diff sections using a focus string.
+- You need to page through large diffs using cursors.
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
 		outputSchema: z.object({
@@ -208,22 +170,10 @@ Next:
 		description: `
 Search indexed workshop content to find where a topic is taught.
 
-Behavior:
-- Uses semantic vector search when Vectorize + Workers AI bindings are configured.
-- Falls back to keyword search when vector bindings are absent or when vector search fails.
-- If you provide stepNumber, you must also provide exerciseNumber.
-
-Returns:
-- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
-- structuredContent is validated and described by this tool's outputSchema.
-
-Examples:
-- "Find closures" → { query: "closures" }
-- "Search within a workshop" → { query: "durable objects", workshop: "mcp-fundamentals" }
-- "Search within a specific step" → { query: "OAuth", workshop: "...", exerciseNumber: 1, stepNumber: 1 }
-
-Next:
-- Use the returned scope metadata (workshop/exercise/step) to call 'retrieve_learning_context' or 'retrieve_diff_context'.
+Use when:
+- You have a concept/question and want to locate where it is covered.
+- You want ranked matches (semantic when configured, keyword fallback otherwise).
+- You want to identify a scope to retrieve via other tools.
 		`.trim(),
 		annotations: openWorldReadOnlyToolAnnotations,
 		outputSchema: z.object({
@@ -247,17 +197,9 @@ Use this tool when:
 - The learner asks to be quizzed.
 - You want to solidify understanding with retrieval practice.
 
-Returns:
-- A CallToolResult with human-readable markdown in content, plus machine-friendly structuredContent.
-- structuredContent is validated and described by this tool's outputSchema.
-
-Examples:
-- "Quiz me on closures" → { topic: "JavaScript closures" }
-- "Short quiz" → { topic: "OAuth", questionCount: 5 }
-
-Next:
-- Follow the protocol in the markdown output.
-- Pair with 'retrieve_learning_context' or 'search_topic_context' to gather source material for questions.
+Use when:
+- You want a consistent quiz protocol + checklist.
+- You want a set of question types and follow-ups to guide the session.
 		`.trim(),
 		annotations: readOnlyToolAnnotations,
 		outputSchema: quizInstructionsOutputSchema,

@@ -160,6 +160,16 @@ export async function registerTools(agent: MCP) {
 							: '_default_'
 					}`,
 				].join('\n- ')
+				const nextSteps: Array<string> = []
+				if (args.data.all === false) {
+					if (result.nextCursor) {
+						nextSteps.push(
+							`Call \`list_workshops\` again with { all: false, cursor: nextCursor } to fetch the next page.`,
+						)
+					} else {
+						nextSteps.push('No nextCursor returned; this is the last page.')
+					}
+				}
 				return {
 					content: [
 						{
@@ -184,8 +194,11 @@ export async function registerTools(agent: MCP) {
 								...(workshops.length > preview.length
 									? [
 											'',
-											`_…and ${workshops.length - preview.length} more. Full list is in structuredContent._`,
+											`_…and ${workshops.length - preview.length} more. See the structured output for the full list._`,
 										]
+									: []),
+								...(nextSteps.length > 0
+									? ['', 'Next:', ...nextSteps.map((step) => `- ${step}`)]
 									: []),
 							].join('\n'),
 						},
@@ -230,6 +243,16 @@ export async function registerTools(agent: MCP) {
 					typeof args.data.maxChars === 'number'
 						? `\`${String(args.data.maxChars)}\``
 						: '_default_'
+				const continuationSteps: Array<string> = []
+				if (result.truncated && result.nextCursor) {
+					const stepNumberPart =
+						typeof result.stepNumber === 'number'
+							? `, stepNumber: ${result.stepNumber}`
+							: ''
+					continuationSteps.push(
+						`Call \`retrieve_learning_context\` again with { workshop: "${result.workshop}", exerciseNumber: ${result.exerciseNumber}${stepNumberPart}, cursor: nextCursor }.`,
+					)
+				}
 				return {
 					content: [
 						{
@@ -250,6 +273,13 @@ export async function registerTools(agent: MCP) {
 								`- sections: **${result.sections.length}**`,
 								'',
 								formatSectionsMarkdown(result.sections),
+								...(continuationSteps.length > 0
+									? [
+											'',
+											'Next:',
+											...continuationSteps.map((step) => `- ${step}`),
+										]
+									: []),
 							].join('\n'),
 						},
 					],
@@ -305,6 +335,20 @@ export async function registerTools(agent: MCP) {
 					typeof args.data.focus === 'string' && args.data.focus.trim()
 						? `\`${args.data.focus.trim()}\``
 						: '_none_'
+				const diffContinuationSteps: Array<string> = []
+				if (result.truncated && result.nextCursor) {
+					const stepNumberPart =
+						typeof result.stepNumber === 'number'
+							? `, stepNumber: ${result.stepNumber}`
+							: ''
+					const focusPart =
+						typeof args.data.focus === 'string' && args.data.focus.trim()
+							? `, focus: "${args.data.focus.trim()}"`
+							: ''
+					diffContinuationSteps.push(
+						`Call \`retrieve_diff_context\` again with { workshop: "${result.workshop}", exerciseNumber: ${result.exerciseNumber}${stepNumberPart}${focusPart}, cursor: nextCursor }.`,
+					)
+				}
 				return {
 					content: [
 						{
@@ -325,6 +369,13 @@ export async function registerTools(agent: MCP) {
 								`- diffSections: **${result.diffSections.length}**`,
 								'',
 								formatDiffSectionsMarkdown(result.diffSections),
+								...(diffContinuationSteps.length > 0
+									? [
+											'',
+											'Next:',
+											...diffContinuationSteps.map((step) => `- ${step}`),
+										]
+									: []),
 							].join('\n'),
 						},
 					],
@@ -372,6 +423,12 @@ export async function registerTools(agent: MCP) {
 					stepNumber: args.data.stepNumber,
 				})
 				const warnings = result.warnings ?? []
+				const searchNextSteps: Array<string> = []
+				if (result.matches.length > 0) {
+					searchNextSteps.push(
+						'Pick a match and retrieve full context with retrieve_learning_context or retrieve_diff_context using its workshop/exercise/step scope.',
+					)
+				}
 				return {
 					content: [
 						{
@@ -421,6 +478,9 @@ export async function registerTools(agent: MCP) {
 											}),
 										]
 									: ['', '_No matches returned._']),
+								...(searchNextSteps.length > 0
+									? ['', 'Next:', ...searchNextSteps.map((step) => `- ${step}`)]
+									: []),
 							].join('\n'),
 						},
 					],
@@ -476,6 +536,10 @@ export async function registerTools(agent: MCP) {
 								`targetQuestionCount: \`${String(result.targetQuestionCount)}\``,
 								'',
 								result.instructionsMarkdown,
+								'',
+								'Next:',
+								'- Use retrieve_learning_context or search_topic_context to gather source material.',
+								'- Ask one question at a time and follow the protocol.',
 							].join('\n'),
 						},
 					],
