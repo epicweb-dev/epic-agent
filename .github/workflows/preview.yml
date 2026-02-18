@@ -398,10 +398,21 @@ jobs:
           delete_worker() {
             local name="$1"
             local output=""
+            local exit_code=0
             set +e
-            # `wrangler delete` expects the worker name as a positional arg (no --name flag).
-            output="$(bunx wrangler delete "$name" --force 2>&1)"
-            local exit_code="$?"
+            # Support both CLI syntaxes:
+            # - `wrangler delete <name>` (current Wrangler)
+            # - `wrangler delete --name <name>` (older docs/versions)
+            output="$(bunx wrangler delete --name "$name" --force 2>&1)"
+            exit_code="$?"
+            if [ "$exit_code" -ne 0 ]; then
+              local lower_attempt
+              lower_attempt="$(echo "$output" | tr '[:upper:]' '[:lower:]')"
+              if [[ "$lower_attempt" == *"unknown argument"* ]] || [[ "$lower_attempt" == *"unknown option"* ]] || [[ "$lower_attempt" == *"unknown flag"* ]]; then
+                output="$(bunx wrangler delete "$name" --force 2>&1)"
+                exit_code="$?"
+              fi
+            fi
             set -e
 
             if [ "$exit_code" -eq 0 ]; then
