@@ -182,6 +182,10 @@ async function main() {
 			databaseName: assertString(d1DatabaseName, '--d1-database-name <name>'),
 			databaseId: assertString(d1DatabaseId, '--d1-database-id <uuid>'),
 		})
+	} else if (d1Binding || d1DatabaseName || d1DatabaseId) {
+		fail(
+			'D1 patch requires --d1-binding, --d1-database-name, and --d1-database-id.',
+		)
 	}
 
 	const kvBinding = options.kvBinding?.trim() ?? ''
