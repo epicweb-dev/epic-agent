@@ -47,3 +47,15 @@ We use bun for installing dependencies and running scripts. Do not use npm.
 - [Request Lifecycle](./docs/architecture/request-lifecycle.md)
 - [Authentication](./docs/architecture/authentication.md)
 - [Data Storage](./docs/architecture/data-storage.md)
+
+## Cloud-specific instructions
+
+- Bun must be installed (`curl -fsSL https://bun.sh/install | bash`); the VM
+  does not ship it by default.
+- After `bun install`, run `bun run test:e2e:install` to install Playwright
+  Chromium before E2E tests.
+- The dev server (`bun run dev`) defaults to `localhost:3742`. Wrangler handles
+  D1, KV, and Durable Objects locally; Vectorize and AI bindings are unavailable
+  in local mode (keyword fallback is used).
+- See `docs/agents/setup.md` for all commands (lint, typecheck, build, test,
+  dev).
