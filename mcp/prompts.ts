@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { MCP } from './index.ts'
+import { type MCP } from './index.ts'
 import { promptsMetadata } from './metadata.ts'
 
 export function registerPrompts(agent: MCP) {

@@ -1,4 +1,4 @@
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
+import { type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
 
 export const serverMetadata = {
 	name: 'epic-agent-mcp',

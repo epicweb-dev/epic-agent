@@ -1,4 +1,4 @@
-import type { MCP } from './index.ts'
+import { type MCP } from './index.ts'
 import { mcpServerBestPracticesMarkdown } from './mcp-server-best-practices.ts'
 import { resourcesMetadata, serverMetadata, toolsMetadata } from './metadata.ts'
 
