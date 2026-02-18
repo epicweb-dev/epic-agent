@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
 import { nonDeterministicReadOnlyToolAnnotations } from '../server-metadata.ts'
+import { retrievalSectionOutputSchema } from '../tool-output-schemas.ts'
 import { retrieveLearningContextInputSchema } from '../workshop-contracts.ts'
 import { retrieveLearningContext } from '../workshop-retrieval.ts'
 import {
@@ -22,15 +23,6 @@ Use when:
 - You want a random indexed scope to practice or sample.
 - You need to page through large contexts using cursors.
 `.trim()
-
-const retrievalSectionOutputSchema = z.object({
-	label: z.string(),
-	kind: z.string(),
-	content: z.string(),
-	sourcePath: z.string().optional(),
-	exerciseNumber: z.number().int().positive().optional(),
-	stepNumber: z.number().int().positive().optional(),
-})
 
 const outputSchema = z.object({
 	workshop: z.string(),

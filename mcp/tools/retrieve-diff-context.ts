@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { type MCP } from '../index.ts'
 import { readOnlyToolAnnotations } from '../server-metadata.ts'
+import { retrievalSectionOutputSchema } from '../tool-output-schemas.ts'
 import { retrieveDiffContextInputSchema } from '../workshop-contracts.ts'
 import { retrieveDiffContext } from '../workshop-retrieval.ts'
 import {
@@ -22,15 +23,6 @@ Use when:
 - You want to narrow down diff sections using a focus string.
 - You need to page through large diffs using cursors.
 `.trim()
-
-const retrievalSectionOutputSchema = z.object({
-	label: z.string(),
-	kind: z.string(),
-	content: z.string(),
-	sourcePath: z.string().optional(),
-	exerciseNumber: z.number().int().positive().optional(),
-	stepNumber: z.number().int().positive().optional(),
-})
 
 const outputSchema = z.object({
 	workshop: z.string(),
