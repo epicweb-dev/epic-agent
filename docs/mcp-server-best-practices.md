@@ -63,10 +63,32 @@ examples).
 Tools have _detailed, structured descriptions_ that include:
 
 1. **What the tool does** (1-2 sentences)
-2. **Inputs** with examples and valid values
+2. **Behavioral input notes** (defaults, cross-field constraints, and any
+   non-obvious rules)
 3. **Returns** - what the response structure looks like
 4. **Next steps** - what to do after calling this tool
 5. **Examples** - concrete usage examples
+
+### Avoid schema duplication
+
+When a server already provides a rich input schema (for example, Zod/JSON Schema
+with per-field `.describe()` metadata), treat the schema as the source of truth
+for parameter types, requiredness, ranges, and per-field descriptions.
+
+In that case, tool descriptions should:
+
+- Focus on **semantics** (what the tool _means_, not just what it accepts)
+- Call out **cross-field constraints** the schema may not capture well (for
+  example: "if you pass `stepNumber`, you must also pass `exerciseNumber`")
+- Call out **defaults** and **server-side behavior** (pagination, truncation,
+  fallbacks) that are easy to miss
+- Include **returns**, **examples**, and **next-step chaining**
+
+Tool descriptions should generally _not_:
+
+- Repeat every input parameter with its type/requiredness if the schema already
+  documents it
+- Copy/paste the schema text into the tool description
 
 **Best Practice Format:**
 
@@ -74,8 +96,8 @@ Tools have _detailed, structured descriptions_ that include:
 Brief description of what the tool does.
 
 Inputs:
-- param1: type (required/optional) — description with examples
-- param2: type — description
+- See the input schema for parameter-level details.
+- Call out only non-obvious constraints and defaults here.
 
 Returns: { field1, field2, ... }
 

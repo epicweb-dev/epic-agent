@@ -57,12 +57,9 @@ export const toolsMetadata = {
 		description: `
 List indexed workshops and metadata coverage.
 
-Inputs:
-- limit: integer (optional, max: 100) — Page size when { all: false }.
-- all: boolean (optional, default: true) — When true, fetches all pages. When false, returns a single page + nextCursor.
-- cursor: string (optional) — Pagination cursor from a previous { all: false } call.
-- product: string (optional) — Filter workshops by product label.
-- hasDiffs: boolean (optional) — Filter workshops by whether diff context is available.
+Behavior:
+- By default, this tool fetches all pages so callers get the full list.
+- Set { all: false } to paginate manually using { limit, cursor } and the returned nextCursor.
 
 Returns (structuredContent): { workshops: Array<{ workshop, title, product?, exerciseCount, hasDiffs, lastIndexedAt }>, nextCursor? }
 
@@ -87,13 +84,9 @@ Modes:
 - Explicit scope: provide { workshop, exerciseNumber, stepNumber? }
 - Random scope: provide { random: true } (non-deterministic)
 
-Inputs:
-- workshop: string (required unless random=true) — Workshop slug from 'list_workshops'.
-- exerciseNumber: integer (required unless random=true) — Exercise number.
-- stepNumber: integer (optional) — Step number within the exercise.
-- random: boolean (optional) — When true, picks a random indexed exercise scope.
-- maxChars: integer (optional) — Soft maximum for returned section content; server may clamp.
-- cursor: string (optional) — Continuation cursor when responses are truncated.
+Behavior:
+- Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
+- Explicit scope is deterministic; random scope is not.
 
 Returns (structuredContent): { workshop, exerciseNumber, stepNumber?, sections[], truncated, nextCursor? }
 
@@ -115,13 +108,9 @@ Next:
 		description: `
 Retrieve diff-focused context sections for a scoped workshop exercise/step.
 
-Inputs:
-- workshop: string (required) — Workshop slug from 'list_workshops'.
-- exerciseNumber: integer (required) — Exercise number.
-- stepNumber: integer (optional) — Step number within the exercise.
-- focus: string (optional) — Case-insensitive filter over diff label/kind/source path/content (whitespace-only is ignored).
-- maxChars: integer (optional) — Soft maximum for returned section content; server may clamp.
-- cursor: string (optional) — Continuation cursor when responses are truncated.
+Behavior:
+- Optional focus filtering is case-insensitive; whitespace-only focus values are treated as omitted.
+- Responses may be truncated; when truncated is true, pass nextCursor back as cursor to continue.
 
 Returns (structuredContent): { workshop, exerciseNumber, stepNumber?, diffSections[], truncated, nextCursor? }
 
@@ -145,13 +134,7 @@ Search indexed workshop content to find where a topic is taught.
 Behavior:
 - Uses semantic vector search when Vectorize + Workers AI bindings are configured.
 - Falls back to keyword search when vector bindings are absent or when vector search fails.
-
-Inputs:
-- query: string (required, min: 3 chars) — Topic query to search for.
-- limit: integer (optional, max: 20) — Max matches to return.
-- workshop: string (optional) — Limit search to a workshop slug.
-- exerciseNumber: integer (optional) — Limit search to an exercise number (requires workshop to be exact-scope; otherwise searches across all workshops).
-- stepNumber: integer (optional) — Limit search to a step number (requires exerciseNumber).
+- If you provide stepNumber, you must also provide exerciseNumber.
 
 Returns (structuredContent): { query, limit, mode, vectorSearchAvailable, warnings?, matches[] }
 
@@ -175,11 +158,6 @@ Return evidence-based instructions for conducting a quiz (one question at a time
 Use this tool when:
 - The learner asks to be quizzed.
 - You want to solidify understanding with retrieval practice.
-
-Inputs:
-- topic: string (optional) — Topic label to include in the quiz protocol.
-- learnerGoal: string (optional) — Learner goal to tailor the protocol.
-- questionCount: integer (optional, max: 20, default: 8) — Target number of questions.
 
 Returns (structuredContent): { tool, version, topic, learnerGoal, targetQuestionCount, instructionsMarkdown, checklist, questionTypes, closingSteps }
 
