@@ -171,6 +171,12 @@ async function listLastIndexedShas(db: D1Database) {
 	return map
 }
 
+function shortSha(sha: string | undefined) {
+	const trimmed = (sha ?? '').trim()
+	if (trimmed.length === 0) return null
+	return trimmed.length > 12 ? trimmed.slice(0, 12) : trimmed
+}
+
 async function mapWithConcurrency<T, R>(
 	items: ReadonlyArray<T>,
 	limit: number,
@@ -195,6 +201,10 @@ async function mapWithConcurrency<T, R>(
 
 async function runIndexForWorkshops(workshops: ReadonlyArray<string>) {
 	const workshopListInput = workshops.join('\n')
+	console.info(
+		'workshop-nightly-reindex-start',
+		JSON.stringify({ workshopCount: workshops.length, workshops }),
+	)
 	const child = spawn('bun', ['tools/workshop-content-load-from-clones.ts'], {
 		stdio: 'inherit',
 		env: {
@@ -213,6 +223,10 @@ async function runIndexForWorkshops(workshops: ReadonlyArray<string>) {
 			)})`,
 		)
 	}
+	console.info(
+		'workshop-nightly-reindex-complete',
+		JSON.stringify({ workshopCount: workshops.length }),
+	)
 }
 
 async function main() {
@@ -243,10 +257,29 @@ async function main() {
 
 	const startedAt = Date.now()
 	const token = parsed.GITHUB_TOKEN
+	console.info(
+		'workshop-nightly-discovery',
+		JSON.stringify({
+			targetEnvironment: parsed.TARGET_ENVIRONMENT,
+			repositoryCount: repositories.length,
+			indexedWorkshopCount: lastIndexed.size,
+		}),
+	)
+
 	const comparisons = await mapWithConcurrency(repositories, 4, async (repo) => {
 		const slug = repo.name.trim().toLowerCase()
 		const baseSha = lastIndexed.get(slug)
 		if (!baseSha) {
+			console.info(
+				'workshop-nightly-check',
+				JSON.stringify({
+					workshop: slug,
+					repository: `${repo.owner}/${repo.name}`,
+					defaultBranch: repo.defaultBranch,
+					result: 'index',
+					reason: 'missing-index',
+				}),
+			)
 			return { slug, shouldIndex: true, reason: 'missing-index' as const }
 		}
 
@@ -258,6 +291,17 @@ async function main() {
 				headRef: repo.defaultBranch,
 				token,
 			})
+			console.info(
+				'workshop-nightly-check',
+				JSON.stringify({
+					workshop: slug,
+					repository: `${repo.owner}/${repo.name}`,
+					defaultBranch: repo.defaultBranch,
+					baseSha: shortSha(baseSha),
+					result: changed ? 'index' : 'skip',
+					reason: changed ? 'content-changed' : 'unchanged',
+				}),
+			)
 			return {
 				slug,
 				shouldIndex: changed,
@@ -266,7 +310,7 @@ async function main() {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			console.warn(
-				'workshop-nightly-compare-failed',
+				'workshop-nightly-check',
 				JSON.stringify({ workshop: slug, error: message }),
 			)
 			return { slug, shouldIndex: true, reason: 'compare-failed' as const }
