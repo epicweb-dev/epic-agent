@@ -8,6 +8,7 @@ import {
 	truncateSections,
 	type RetrievalSection,
 } from './workshop-truncation.ts'
+import { prepareEmbeddingText } from './workshop-embeddings.ts'
 import {
 	listWorkshopsMaxLimit,
 	topicSearchMaxLimit,
@@ -470,7 +471,7 @@ export async function retrieveDiffContext({
 
 async function embedSearchQuery({ ai, query }: { ai: Ai; query: string }) {
 	const response = (await ai.run('@cf/baai/bge-base-en-v1.5', {
-		text: [query],
+		text: [prepareEmbeddingText({ content: query })],
 	})) as unknown
 
 	if (Array.isArray(response)) {
