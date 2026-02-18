@@ -10,6 +10,7 @@ export const listWorkshopsInputSchema = {
 		.positive()
 		.max(listWorkshopsMaxLimit)
 		.optional(),
+	all: z.boolean().optional(),
 	cursor: z.string().optional(),
 	product: z.string().trim().min(1).optional(),
 	hasDiffs: z.boolean().optional(),

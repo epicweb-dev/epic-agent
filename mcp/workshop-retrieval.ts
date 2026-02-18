@@ -158,39 +158,100 @@ function filterByFocus(sections: Array<RetrievalSection>, focus: string) {
 export async function retrieveWorkshopList({
 	env,
 	limit,
+	all,
 	cursor,
 	product,
 	hasDiffs,
 }: {
 	env: Env
 	limit?: number
+	all?: boolean
 	cursor?: string
 	product?: string
 	hasDiffs?: boolean
 }) {
 	const startedAt = Date.now()
-	const maxLimit = Math.min(Math.max(limit ?? 20, 1), listWorkshopsMaxLimit)
-	const result = await listIndexedWorkshops({
-		db: env.APP_DB,
-		limit: maxLimit,
-		cursor,
-		product,
-		hasDiffs,
-	})
+	const requestedLimit =
+		typeof limit === 'number' && Number.isFinite(limit)
+			? limit
+			: listWorkshopsMaxLimit
+	const pageLimit = Math.min(Math.max(requestedLimit, 1), listWorkshopsMaxLimit)
+	// Default to fetching all pages to avoid "it only returned the first 20/100"
+	// surprises. Callers can opt into a single page response with `all: false`.
+	const shouldFetchAll = all !== false
+
+	if (!shouldFetchAll) {
+		const result = await listIndexedWorkshops({
+			db: env.APP_DB,
+			limit: pageLimit,
+			cursor,
+			product,
+			hasDiffs,
+		})
+		console.info(
+			'mcp-list-workshops',
+			JSON.stringify({
+				all: false,
+				limit: pageLimit,
+				product,
+				hasDiffs,
+				workshopCount: result.workshops.length,
+				hasNextCursor: Boolean(result.nextCursor),
+				durationMs: Date.now() - startedAt,
+			}),
+		)
+		return {
+			workshops: result.workshops,
+			nextCursor: result.nextCursor ?? undefined,
+		}
+	}
+
+	const maxPages = 500
+	const maxWorkshops = 10_000
+	const allWorkshops: Awaited<
+		ReturnType<typeof listIndexedWorkshops>
+	>['workshops'] = []
+	let nextCursor = cursor
+	let pageCount = 0
+
+	while (true) {
+		pageCount += 1
+		if (pageCount > maxPages) {
+			throw new Error(
+				`Exceeded maximum list_workshops pagination pages (${maxPages}).`,
+			)
+		}
+		const remaining = maxWorkshops - allWorkshops.length
+		if (remaining <= 0) break
+		const limitForPage = Math.min(pageLimit, remaining)
+		const result = await listIndexedWorkshops({
+			db: env.APP_DB,
+			limit: limitForPage,
+			cursor: nextCursor,
+			product,
+			hasDiffs,
+		})
+		allWorkshops.push(...result.workshops)
+		nextCursor = result.nextCursor ?? undefined
+		if (!nextCursor) break
+	}
+
 	console.info(
 		'mcp-list-workshops',
 		JSON.stringify({
-			limit: maxLimit,
+			all: true,
+			pageLimit,
+			pageCount,
 			product,
 			hasDiffs,
-			workshopCount: result.workshops.length,
-			hasNextCursor: Boolean(result.nextCursor),
+			workshopCount: allWorkshops.length,
+			hasNextCursor: Boolean(nextCursor),
 			durationMs: Date.now() - startedAt,
 		}),
 	)
 	return {
-		workshops: result.workshops,
-		nextCursor: result.nextCursor ?? undefined,
+		workshops: allWorkshops,
+		...(nextCursor ? { nextCursor } : {}),
 	}
 }
 

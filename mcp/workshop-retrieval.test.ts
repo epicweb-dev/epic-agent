@@ -429,7 +429,20 @@ test('searchTopicContext falls back to keyword search without vector bindings', 
 	expect(result.matches.length).toBe(1)
 })
 
-test('retrieveWorkshopList clamps limit to shared max', async () => {
+async function runRetrieveWorkshopListWithFixedRows({
+	limit,
+	rows,
+}: {
+	limit?: number
+	rows: Array<{
+		workshop_slug: string
+		title: string
+		exercise_count: number
+		has_diffs: number
+		last_indexed_at: string
+		product?: string
+	}>
+}) {
 	const observedListBindCalls: Array<Array<number>> = []
 	const db = {
 		prepare() {
@@ -439,16 +452,69 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 					return {
 						async all() {
 							return {
-								results: [
-									{
-										workshop_slug: 'mcp-fundamentals',
-										title: 'MCP Fundamentals',
-										exercise_count: 3,
-										has_diffs: 1,
-										last_indexed_at: '2026-02-14T00:00:00.000Z',
-										product: 'epicweb',
-									},
-								],
+								results: rows,
+							}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+	const env = { APP_DB: db } as unknown as Env
+	const input = typeof limit === 'number' ? { env, limit } : { env }
+	const result = await retrieveWorkshopList(input)
+	return { observedListBindCalls, result }
+}
+
+test('retrieveWorkshopList clamps limit to shared max', async () => {
+	const { observedListBindCalls, result } =
+		await runRetrieveWorkshopListWithFixedRows({
+			limit: 999,
+			rows: [
+				{
+					workshop_slug: 'mcp-fundamentals',
+					title: 'MCP Fundamentals',
+					exercise_count: 3,
+					has_diffs: 1,
+					last_indexed_at: '2026-02-14T00:00:00.000Z',
+					product: 'epicweb',
+				},
+			],
+		})
+
+	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
+	expect(result.workshops).toHaveLength(1)
+})
+
+test('retrieveWorkshopList defaults limit to shared max', async () => {
+	const { observedListBindCalls } = await runRetrieveWorkshopListWithFixedRows({
+		rows: [],
+	})
+
+	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
+})
+
+test('retrieveWorkshopList fetches all pages by default', async () => {
+	const rows = Array.from({ length: 250 }, (_, index) => ({
+		workshop_slug: `workshop-${String(index).padStart(3, '0')}`,
+		title: `Workshop ${index}`,
+		exercise_count: 1,
+		has_diffs: index % 2,
+		last_indexed_at: '2026-02-14T00:00:00.000Z',
+		product: 'epicweb',
+	}))
+	const observedListBindCalls: Array<Array<number>> = []
+	const db = {
+		prepare() {
+			return {
+				bind(...args: Array<unknown>) {
+					const limit = Number(args.at(-2) ?? 0)
+					const offset = Number(args.at(-1) ?? 0)
+					observedListBindCalls.push([limit, offset])
+					return {
+						async all() {
+							return {
+								results: rows.slice(offset, offset + limit),
 							}
 						},
 					}
@@ -458,13 +524,95 @@ test('retrieveWorkshopList clamps limit to shared max', async () => {
 	} as unknown as D1Database
 	const env = { APP_DB: db } as unknown as Env
 
-	const result = await retrieveWorkshopList({
-		env,
-		limit: 999,
-	})
+	const result = await retrieveWorkshopList({ env })
 
+	expect(result.workshops).toHaveLength(250)
+	expect(result.nextCursor).toBeUndefined()
+	expect(observedListBindCalls).toEqual([
+		[listWorkshopsMaxLimit + 1, 0],
+		[listWorkshopsMaxLimit + 1, 100],
+		[listWorkshopsMaxLimit + 1, 200],
+	])
+})
+
+test('retrieveWorkshopList returns a single page when all is false', async () => {
+	const rows = Array.from({ length: 250 }, (_, index) => ({
+		workshop_slug: `workshop-${String(index).padStart(3, '0')}`,
+		title: `Workshop ${index}`,
+		exercise_count: 1,
+		has_diffs: index % 2,
+		last_indexed_at: '2026-02-14T00:00:00.000Z',
+		product: 'epicweb',
+	}))
+	const observedListBindCalls: Array<Array<number>> = []
+	const db = {
+		prepare() {
+			return {
+				bind(...args: Array<unknown>) {
+					const limit = Number(args.at(-2) ?? 0)
+					const offset = Number(args.at(-1) ?? 0)
+					observedListBindCalls.push([limit, offset])
+					return {
+						async all() {
+							return {
+								results: rows.slice(offset, offset + limit),
+							}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+	const env = { APP_DB: db } as unknown as Env
+
+	const result = await retrieveWorkshopList({ env, all: false })
+
+	expect(result.workshops).toHaveLength(listWorkshopsMaxLimit)
+	expect(typeof result.nextCursor).toBe('string')
 	expect(observedListBindCalls).toEqual([[listWorkshopsMaxLimit + 1, 0]])
-	expect(result.workshops).toHaveLength(1)
+})
+
+test('retrieveWorkshopList treats limit as per-page size when fetching all', async () => {
+	const rows = Array.from({ length: 250 }, (_, index) => ({
+		workshop_slug: `workshop-${String(index).padStart(3, '0')}`,
+		title: `Workshop ${index}`,
+		exercise_count: 1,
+		has_diffs: index % 2,
+		last_indexed_at: '2026-02-14T00:00:00.000Z',
+		product: 'epicweb',
+	}))
+	const observedListBindCalls: Array<Array<number>> = []
+	const db = {
+		prepare() {
+			return {
+				bind(...args: Array<unknown>) {
+					const limit = Number(args.at(-2) ?? 0)
+					const offset = Number(args.at(-1) ?? 0)
+					observedListBindCalls.push([limit, offset])
+					return {
+						async all() {
+							return {
+								results: rows.slice(offset, offset + limit),
+							}
+						},
+					}
+				},
+			}
+		},
+	} as unknown as D1Database
+	const env = { APP_DB: db } as unknown as Env
+
+	const result = await retrieveWorkshopList({ env, limit: 50 })
+
+	expect(result.workshops).toHaveLength(250)
+	expect(result.nextCursor).toBeUndefined()
+	expect(observedListBindCalls).toEqual([
+		[51, 0],
+		[51, 50],
+		[51, 100],
+		[51, 150],
+		[51, 200],
+	])
 })
 
 test('searchTopicContext validates workshop scope before binding checks', async () => {

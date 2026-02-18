@@ -86,6 +86,7 @@ export async function registerTools(agent: MCP) {
 				const result = await retrieveWorkshopList({
 					env: agent.requireEnv(),
 					limit: args.data.limit,
+					all: args.data.all,
 					cursor: args.data.cursor,
 					product: args.data.product,
 					hasDiffs: args.data.hasDiffs,
