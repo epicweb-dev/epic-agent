@@ -266,56 +266,62 @@ async function main() {
 		}),
 	)
 
-	const comparisons = await mapWithConcurrency(repositories, 4, async (repo) => {
-		const slug = repo.name.trim().toLowerCase()
-		const baseSha = lastIndexed.get(slug)
-		if (!baseSha) {
-			console.info(
-				'workshop-nightly-check',
-				JSON.stringify({
-					workshop: slug,
-					repository: `${repo.owner}/${repo.name}`,
-					defaultBranch: repo.defaultBranch,
-					result: 'index',
-					reason: 'missing-index',
-				}),
-			)
-			return { slug, shouldIndex: true, reason: 'missing-index' as const }
-		}
-
-		try {
-			const changed = await compareIncludesWorkshopContent({
-				owner: repo.owner,
-				repo: repo.name,
-				baseSha,
-				headRef: repo.defaultBranch,
-				token,
-			})
-			console.info(
-				'workshop-nightly-check',
-				JSON.stringify({
-					workshop: slug,
-					repository: `${repo.owner}/${repo.name}`,
-					defaultBranch: repo.defaultBranch,
-					baseSha: shortSha(baseSha),
-					result: changed ? 'index' : 'skip',
-					reason: changed ? 'content-changed' : 'unchanged',
-				}),
-			)
-			return {
-				slug,
-				shouldIndex: changed,
-				reason: changed ? ('content-changed' as const) : ('unchanged' as const),
+	const comparisons = await mapWithConcurrency(
+		repositories,
+		4,
+		async (repo) => {
+			const slug = repo.name.trim().toLowerCase()
+			const baseSha = lastIndexed.get(slug)
+			if (!baseSha) {
+				console.info(
+					'workshop-nightly-check',
+					JSON.stringify({
+						workshop: slug,
+						repository: `${repo.owner}/${repo.name}`,
+						defaultBranch: repo.defaultBranch,
+						result: 'index',
+						reason: 'missing-index',
+					}),
+				)
+				return { slug, shouldIndex: true, reason: 'missing-index' as const }
 			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			console.warn(
-				'workshop-nightly-check',
-				JSON.stringify({ workshop: slug, error: message }),
-			)
-			return { slug, shouldIndex: true, reason: 'compare-failed' as const }
-		}
-	})
+
+			try {
+				const changed = await compareIncludesWorkshopContent({
+					owner: repo.owner,
+					repo: repo.name,
+					baseSha,
+					headRef: repo.defaultBranch,
+					token,
+				})
+				console.info(
+					'workshop-nightly-check',
+					JSON.stringify({
+						workshop: slug,
+						repository: `${repo.owner}/${repo.name}`,
+						defaultBranch: repo.defaultBranch,
+						baseSha: shortSha(baseSha),
+						result: changed ? 'index' : 'skip',
+						reason: changed ? 'content-changed' : 'unchanged',
+					}),
+				)
+				return {
+					slug,
+					shouldIndex: changed,
+					reason: changed
+						? ('content-changed' as const)
+						: ('unchanged' as const),
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				console.warn(
+					'workshop-nightly-check',
+					JSON.stringify({ workshop: slug, error: message }),
+				)
+				return { slug, shouldIndex: true, reason: 'compare-failed' as const }
+			}
+		},
+	)
 
 	const toIndex = comparisons
 		.filter((entry) => entry.shouldIndex)
@@ -334,12 +340,7 @@ async function main() {
 			`- Duration (detect): ${Math.round((Date.now() - startedAt) / 1000)}s`,
 			'',
 			...(toIndex.length
-				? [
-						'Workshops to index:',
-						'',
-						...toIndex.map((slug) => `- ${slug}`),
-						'',
-					]
+				? ['Workshops to index:', '', ...toIndex.map((slug) => `- ${slug}`), '']
 				: ['No workshop content changes detected.', '']),
 		].join('\n'),
 	)

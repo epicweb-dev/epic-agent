@@ -1,6 +1,7 @@
 import { invariant } from '@epic-web/invariant'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { McpAgent } from 'agents/mcp'
+import { serverMetadata } from './server-metadata.ts'
 import { registerTools } from './tools.ts'
 
 export type State = {}
@@ -8,16 +9,9 @@ export type Props = {
 	baseUrl: string
 }
 export class MCP extends McpAgent<Env, State, Props> {
-	server = new McpServer(
-		{
-			name: 'MCP',
-			version: '1.0.0',
-		},
-		{
-			instructions:
-				'Use this server to retrieve indexed Epic Workshop context for quiz authoring. If a learner asks to be quizzed or wants to solidify understanding, call retrieve_quiz_instructions and follow the protocol (one question at a time).',
-		},
-	)
+	server = new McpServer(serverMetadata.implementation, {
+		instructions: serverMetadata.instructions,
+	})
 	async init() {
 		await registerTools(this)
 	}
