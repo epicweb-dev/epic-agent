@@ -167,13 +167,20 @@ export async function registerTools(agent: MCP) {
 				return buildErrorResult(`Invalid input: ${args.error.message}`)
 			}
 
-			const result = buildQuizInstructionsResult(args.data)
-			return {
-				content: [
-					{ type: 'text', text: result.instructionsMarkdown },
-					{ type: 'text', text: formatJson(result) },
-				],
-				structuredContent: result,
+			try {
+				const result = buildQuizInstructionsResult(args.data)
+				return {
+					content: [
+						{ type: 'text', text: result.instructionsMarkdown },
+						{ type: 'text', text: formatJson(result) },
+					],
+					structuredContent: result,
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error)
+				return buildErrorResult(
+					`Unable to retrieve quiz instructions: ${message}`,
+				)
 			}
 		},
 	)

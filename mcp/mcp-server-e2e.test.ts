@@ -788,6 +788,27 @@ test(
 		const textOutput = getTextResultContent(result as CallToolResult)
 		expect(textOutput).toContain('Quiz facilitation protocol')
 		expect(textOutput).toContain('Topic: JavaScript closures')
+		expect(textOutput).toContain('Target: 5 questions')
+		expect(textOutput).toContain('Ask exactly one question at a time')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'mcp quiz instructions tool supports empty arguments',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'retrieve_quiz_instructions',
+			arguments: {},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain('Quiz facilitation protocol')
+		expect(textOutput).toContain('Target: 8 questions')
 		expect(textOutput).toContain('Ask exactly one question at a time')
 	},
 	{ timeout: defaultTimeoutMs },

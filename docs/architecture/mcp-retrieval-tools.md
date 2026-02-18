@@ -9,10 +9,10 @@ The MCP server currently exposes these retrieval-oriented tools:
 
 - `list_workshops`
 - `retrieve_learning_context`
-- `retrieve_quiz_instructions` (quiz facilitation protocol / retention
-  checklist)
 - `retrieve_diff_context`
 - `search_topic_context` (requires optional Vectorize + AI bindings)
+- `retrieve_quiz_instructions` (quiz facilitation protocol / retention
+  checklist)
 
 ## `list_workshops`
 
