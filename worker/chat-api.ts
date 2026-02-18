@@ -186,8 +186,9 @@ async function withMcpClient({
 	const transport = new StreamableHTTPClientTransport(serverUrl, {
 		sessionId: mcpSessionId,
 		fetch: (input, init) => {
-			const nextRequest =
-				input instanceof Request ? input : new Request(input, init)
+			// Always rebuild the Request so `init` overrides are applied even when
+			// the transport passes a Request instance.
+			const nextRequest = new Request(input, init)
 			return fetchMcp(nextRequest, env, mcpCtx)
 		},
 	})
