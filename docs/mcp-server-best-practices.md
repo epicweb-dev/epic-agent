@@ -119,11 +119,14 @@ annotations: {
 }
 ```
 
-**Guidelines:** | Annotation | When to use `true` |
-|---------|----------------------| | `readOnlyHint` | GET/LIST operations | |
-`destructiveHint` | DELETE operations, irreversible changes | | `idempotentHint`
-| Same input always produces same result | | `openWorldHint` | Accesses external
-APIs/resources |
+**Guidelines:**
+
+| Annotation        | When to use `true`                      |
+| ----------------- | --------------------------------------- |
+| `readOnlyHint`    | GET/LIST operations                     |
+| `destructiveHint` | DELETE operations, irreversible changes |
+| `idempotentHint`  | Same input always produces same result  |
+| `openWorldHint`   | Accesses external APIs/resources        |
 
 **Our Current State:** ✅ Annotations implemented using `server.registerTool()`
 API
