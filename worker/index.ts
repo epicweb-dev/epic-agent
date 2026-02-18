@@ -1,6 +1,7 @@
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider'
 import { MCP } from '../mcp/index.ts'
 import { handleRequest } from '../server/handler.ts'
+import { ChatAgent } from './chat-agent.ts'
 import {
 	apiHandler,
 	handleAuthorizeRequest,
@@ -18,7 +19,7 @@ import {
 import { chatTurnPath, handleChatTurnRequest } from './chat-api.ts'
 import { withCors } from './utils.ts'
 
-export { MCP }
+export { ChatAgent, MCP }
 
 const disabledWorkshopIndexRoutePath = '/internal/workshop-index/reindex'
 
@@ -70,7 +71,7 @@ const appHandler = withCors({
 		}
 
 		if (url.pathname === chatTurnPath) {
-			return handleChatTurnRequest({ request, env, ctx })
+			return handleChatTurnRequest({ request, env })
 		}
 
 		// Indexing is intentionally not available from the app runtime. Workshop

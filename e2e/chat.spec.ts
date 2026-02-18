@@ -43,4 +43,15 @@ test('chat calls MCP tools', async ({ page }) => {
 	await expect(page.getByText('"workshops"')).toBeVisible({
 		timeout: 15_000,
 	})
+
+	// Second turn ensures the Worker keeps MCP session state server-side.
+	await page.locator('textarea[name="message"]').fill('/tools')
+	await page.getByRole('button', { name: 'Send' }).click()
+
+	await expect(page.getByText('Available MCP tools:')).toBeVisible({
+		timeout: 15_000,
+	})
+	await expect(page.getByText('list_workshops')).toBeVisible({
+		timeout: 15_000,
+	})
 })

@@ -65,7 +65,6 @@ function ChatPage(handle: Handle) {
 	let status: ChatStatus = 'idle'
 	let errorMessage: string | null = null
 	let inputValue = ''
-	let mcpSessionId: string | null = null
 	let shouldScrollToBottom = false
 
 	let messages: Array<ChatMessage> = [
@@ -108,7 +107,6 @@ function ChatPage(handle: Handle) {
 				credentials: 'include',
 				body: JSON.stringify({
 					message: userText,
-					mcpSessionId: mcpSessionId ?? undefined,
 				}),
 			})
 			const payload = (await response.json().catch(() => null)) as
@@ -130,9 +128,6 @@ function ChatPage(handle: Handle) {
 				handle.update()
 				return
 			}
-
-			mcpSessionId =
-				typeof payload.mcpSessionId === 'string' ? payload.mcpSessionId : null
 
 			pushMessage(
 				createMessage({
