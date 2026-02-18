@@ -23,7 +23,7 @@ else
 fi
 
 # Cloudflare Worker names must be URL-safe; normalize to lower-kebab-case.
-slug="$(echo "$PREVIEW_ID" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g' | cut -c1-32)"
+slug="$(echo "$PREVIEW_ID" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g' | cut -c1-32 | sed 's/-*$//')"
 if [ -z "$slug" ]; then
   slug="preview"
 fi
