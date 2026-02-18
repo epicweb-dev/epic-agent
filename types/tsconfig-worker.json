@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"composite": true,
 		"allowImportingTsExtensions": true,
+		"allowArbitraryExtensions": true,
 		"tsBuildInfoFile": "../node_modules/.tmp/tsconfig.worker.tsbuildinfo",
 		"target": "ES2023",
 		"lib": ["ES2023", "WebWorker", "WebWorker.Iterable"],
