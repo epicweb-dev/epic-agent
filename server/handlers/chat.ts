@@ -13,4 +13,3 @@ export default {
 		)
 	},
 } satisfies BuildAction<typeof routes.chat.method, typeof routes.chat.pattern>
-

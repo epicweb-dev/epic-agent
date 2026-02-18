@@ -1,6 +1,6 @@
 import { MessageType } from '@cloudflare/ai-chat/types'
 import { AgentClient } from 'agents/client'
-import type { UIMessage } from 'ai'
+import { type UIMessage } from 'ai'
 import { type Handle } from 'remix/component'
 import { colors, radius, spacing, typography } from './styles/tokens.ts'
 
@@ -21,7 +21,10 @@ function createId(prefix: string) {
 	return `${prefix}-${raw}`
 }
 
-function applyChunkToParts(parts: Array<Record<string, unknown>>, chunk: unknown) {
+function applyChunkToParts(
+	parts: Array<Record<string, unknown>>,
+	chunk: unknown,
+) {
 	if (!chunk || typeof chunk !== 'object') return false
 	const type = (chunk as { type?: unknown }).type
 	if (typeof type !== 'string') return false
@@ -145,7 +148,9 @@ function applyChunkToParts(parts: Array<Record<string, unknown>>, chunk: unknown
 				existing.state = 'output-available'
 				existing.output = (chunk as { output?: unknown }).output
 				if ('preliminary' in (chunk as Record<string, unknown>)) {
-					existing.preliminary = (chunk as { preliminary?: unknown }).preliminary
+					existing.preliminary = (
+						chunk as { preliminary?: unknown }
+					).preliminary
 				}
 			}
 			return true
@@ -198,8 +203,7 @@ function renderMessagePart(part: Record<string, unknown>, index: number) {
 			typeof part.output === 'undefined'
 				? null
 				: JSON.stringify(part.output, null, 2)
-		const errorText =
-			typeof part.errorText === 'string' ? part.errorText : null
+		const errorText = typeof part.errorText === 'string' ? part.errorText : null
 
 		return (
 			<details
@@ -298,7 +302,9 @@ function ChatPage(handle: Handle) {
 			...(stream.metadata ? { metadata: stream.metadata } : {}),
 		}
 
-		const index = messages.findIndex((message) => message.id === updatedMessage.id)
+		const index = messages.findIndex(
+			(message) => message.id === updatedMessage.id,
+		)
 		if (index >= 0) {
 			const copy = [...messages]
 			copy[index] = updatedMessage
@@ -406,11 +412,13 @@ function ChatPage(handle: Handle) {
 					for (let i = messages.length - 1; i >= 0; i -= 1) {
 						if (messages[i]?.role === 'assistant') {
 							messageId = messages[i]?.id ?? messageId
-							existingParts = [...(messages[i]?.parts as unknown as Array<
-								Record<string, unknown>
-							>)]
+							const parts = messages[i]?.parts
+							existingParts = Array.isArray(parts)
+								? [...(parts as unknown as Array<Record<string, unknown>>)]
+								: []
 							existingMetadata =
-								typeof messages[i]?.metadata === 'object' && messages[i]?.metadata
+								typeof messages[i]?.metadata === 'object' &&
+								messages[i]?.metadata
 									? (messages[i]?.metadata as Record<string, unknown>)
 									: undefined
 							break
@@ -473,6 +481,7 @@ function ChatPage(handle: Handle) {
 		agent = new AgentClient({
 			agent: 'ChatAgent',
 			name: 'default',
+			host: typeof window === 'undefined' ? 'localhost' : window.location.host,
 		})
 		agent.addEventListener('message', handleAgentMessage)
 		agent.addEventListener('close', () => {
@@ -484,10 +493,13 @@ function ChatPage(handle: Handle) {
 				if (!signal.aborted) setStatus('ready')
 			})
 			.catch(() => {
-				if (!signal.aborted) setStatus('error', 'Unable to connect to chat agent.')
+				if (!signal.aborted)
+					setStatus('error', 'Unable to connect to chat agent.')
 			})
 
-		agent.send(JSON.stringify({ type: MessageType.CF_AGENT_STREAM_RESUME_REQUEST }))
+		agent.send(
+			JSON.stringify({ type: MessageType.CF_AGENT_STREAM_RESUME_REQUEST }),
+		)
 
 		signal.addEventListener('abort', () => {
 			try {
@@ -601,7 +613,8 @@ function ChatPage(handle: Handle) {
 			>
 				{messages.length === 0 ? (
 					<p css={{ margin: 0, color: colors.textMuted }}>
-						Try: "List the indexed workshops" or "Find where closures are taught".
+						Try: "List the indexed workshops" or "Find where closures are
+						taught".
 					</p>
 				) : null}
 				{messages.map((message) => (
@@ -698,7 +711,13 @@ function ChatPage(handle: Handle) {
 				>
 					Clear history
 				</button>
-				<p css={{ margin: 0, color: colors.textMuted, fontSize: typography.fontSize.sm }}>
+				<p
+					css={{
+						margin: 0,
+						color: colors.textMuted,
+						fontSize: typography.fontSize.sm,
+					}}
+				>
 					Status: {status}
 				</p>
 			</div>
@@ -711,4 +730,3 @@ export function ChatRoute() {
 		<ChatPage />
 	)
 }
-

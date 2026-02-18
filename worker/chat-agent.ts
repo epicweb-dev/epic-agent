@@ -1,4 +1,4 @@
-import { AIChatAgent } from '@cloudflare/ai-chat'
+import { AIChatAgent, type OnChatMessageOptions } from '@cloudflare/ai-chat'
 import {
 	convertToModelMessages,
 	pruneMessages,
@@ -10,7 +10,6 @@ import {
 } from 'ai'
 import { createWorkersAI } from 'workers-ai-provider'
 import { z } from 'zod'
-import type { OnChatMessageOptions } from '@cloudflare/ai-chat'
 import {
 	listWorkshopsInputSchema,
 	retrieveDiffContextInputSchema,
@@ -43,8 +42,8 @@ function buildSystemPrompt() {
 
 export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 	async onChatMessage(
-		onFinish: StreamTextOnFinishCallback<ToolSet>,
-		options?: OnChatMessageOptions,
+		_onFinish: StreamTextOnFinishCallback<ToolSet>,
+		_options?: OnChatMessageOptions,
 	) {
 		if (!this.env.AI) {
 			return new Response(
@@ -156,7 +155,9 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 		}
 
 		const result = streamText({
-			model: workersai('@cf/meta/llama-4-scout-17b-16e-instruct'),
+			// workers-ai-provider currently types only a subset of Workers AI models.
+			// Prefer a typed model name to keep `bun run typecheck` green.
+			model: workersai('@cf/meta/llama-3.1-8b-instruct-awq'),
 			system: buildSystemPrompt(),
 			messages: pruneMessages({
 				messages: await convertToModelMessages(this.messages),
@@ -164,10 +165,8 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 			}),
 			tools,
 			stopWhen: stepCountIs(6),
-			onFinish,
 		})
 
 		return result.toUIMessageStreamResponse()
 	}
 }
-
