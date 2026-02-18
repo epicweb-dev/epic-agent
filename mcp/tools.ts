@@ -22,12 +22,10 @@ function buildErrorResult({
 	title,
 	message,
 	next,
-	structuredContent,
 }: {
 	title: string
 	message: string
 	next?: Array<string>
-	structuredContent?: Record<string, unknown>
 }) {
 	const nextSteps = next?.filter(Boolean) ?? []
 	return {
@@ -45,7 +43,6 @@ function buildErrorResult({
 				].join('\n'),
 			},
 		],
-		...(structuredContent ? { structuredContent } : {}),
 	}
 }
 
@@ -65,12 +62,6 @@ function buildInputValidationErrorResult({
 			'Double-check required fields and value ranges in the tool description.',
 			...(next ?? []),
 		],
-		structuredContent: {
-			error: 'INPUT_VALIDATION_ERROR',
-			tool,
-			message: error.message,
-			issues: error.issues,
-		},
 	})
 }
 
@@ -207,10 +198,6 @@ export async function registerTools(agent: MCP) {
 					title: 'Unable to list workshops',
 					message,
 					next: ['Try again with a smaller limit or with { all: false }.'],
-					structuredContent: {
-						error: 'LIST_WORKSHOPS_FAILED',
-						message,
-					},
 				})
 			}
 		},
@@ -277,10 +264,6 @@ export async function registerTools(agent: MCP) {
 						'Verify the workshop slug with list_workshops.',
 						'If this is a truncation issue, pass nextCursor back as cursor.',
 					],
-					structuredContent: {
-						error: 'RETRIEVE_LEARNING_CONTEXT_FAILED',
-						message,
-					},
 				})
 			}
 		},
@@ -356,10 +339,6 @@ export async function registerTools(agent: MCP) {
 						'Verify the workshop slug with list_workshops.',
 						'If focus yields no matches, adjust or omit focus.',
 					],
-					structuredContent: {
-						error: 'RETRIEVE_DIFF_CONTEXT_FAILED',
-						message,
-					},
 				})
 			}
 		},
@@ -456,10 +435,6 @@ export async function registerTools(agent: MCP) {
 						'If query is too short, provide at least 3 characters.',
 						'If scoping by stepNumber, also provide exerciseNumber.',
 					],
-					structuredContent: {
-						error: 'SEARCH_TOPIC_CONTEXT_FAILED',
-						message,
-					},
 				})
 			}
 		},
@@ -515,10 +490,6 @@ export async function registerTools(agent: MCP) {
 						'Try again with fewer inputs (all fields are optional).',
 						'If topic/learnerGoal are provided, ensure they are non-empty strings.',
 					],
-					structuredContent: {
-						error: 'RETRIEVE_QUIZ_INSTRUCTIONS_FAILED',
-						message,
-					},
 				})
 			}
 		},
