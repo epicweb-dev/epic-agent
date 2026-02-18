@@ -17,6 +17,8 @@ import {
 const defaultContextMaxChars = 50_000
 const defaultHardMaxChars = 80_000
 const defaultVectorSearchLimit = 8
+const defaultKeywordExcerptMaxChars = 900
+const defaultKeywordExcerptContextChars = 260
 
 type VectorSearchEnv = Env & {
 	WORKSHOP_VECTOR_INDEX?: Vectorize
@@ -483,6 +485,194 @@ async function loadTopicChunkRows({
 	return rowsByVectorId
 }
 
+function scoreFromMatchPos(matchPos: number) {
+	if (!Number.isFinite(matchPos) || matchPos <= 0) return 0
+	// Heuristic for keyword fallback: earlier hits are more relevant.
+	return 1 / (1 + (matchPos - 1) / 80)
+}
+
+function buildKeywordExcerpt({
+	content,
+	query,
+	maxChars = defaultKeywordExcerptMaxChars,
+	contextChars = defaultKeywordExcerptContextChars,
+}: {
+	content: string
+	query: string
+	maxChars?: number
+	contextChars?: number
+}) {
+	const normalizedContent = content ?? ''
+	const normalizedQuery = query.trim()
+	if (!normalizedContent || !normalizedQuery) {
+		return normalizedContent.slice(0, Math.max(0, maxChars))
+	}
+	const haystack = normalizedContent.toLowerCase()
+	const needle = normalizedQuery.toLowerCase()
+	const matchIndex = haystack.indexOf(needle)
+	if (matchIndex < 0) return normalizedContent.slice(0, Math.max(0, maxChars))
+
+	const leftContext = Math.max(0, contextChars)
+	const rightContext = Math.max(0, contextChars)
+	const start = Math.max(0, matchIndex - leftContext)
+	const end = Math.min(
+		normalizedContent.length,
+		matchIndex + normalizedQuery.length + rightContext,
+	)
+	let excerpt = normalizedContent.slice(start, end)
+	if (start > 0) excerpt = `...${excerpt}`
+	if (end < normalizedContent.length) excerpt = `${excerpt}...`
+	if (excerpt.length <= maxChars) return excerpt
+	return `${excerpt.slice(0, Math.max(0, maxChars))}...`
+}
+
+type KeywordChunkMatchRow = {
+	chunk_id?: number | null
+	vector_id?: string | null
+	chunk_content?: string | null
+	workshop_slug?: string | null
+	exercise_number?: number | null
+	step_number?: number | null
+	section_kind?: string | null
+	label?: string | null
+	source_path?: string | null
+	match_pos?: number | null
+}
+
+async function keywordSearchTopicChunks({
+	db,
+	query,
+	limit,
+	workshop,
+	exerciseNumber,
+	stepNumber,
+}: {
+	db: D1Database
+	query: string
+	limit: number
+	workshop?: string
+	exerciseNumber?: number
+	stepNumber?: number
+}) {
+	const loweredQuery = query.toLowerCase()
+	const whereClauses: Array<string> = ['instr(lower(c.content), ?1) > 0']
+	const params: Array<string | number> = [loweredQuery]
+	if (workshop) {
+		whereClauses.push('c.workshop_slug = ?')
+		params.push(workshop)
+	}
+	if (typeof exerciseNumber === 'number') {
+		whereClauses.push('c.exercise_number = ?')
+		params.push(exerciseNumber)
+	}
+	if (typeof stepNumber === 'number') {
+		whereClauses.push('c.step_number = ?')
+		params.push(stepNumber)
+	}
+	const querySql = `
+		SELECT
+			c.id AS chunk_id,
+			c.vector_id,
+			c.content AS chunk_content,
+			c.workshop_slug,
+			c.exercise_number,
+			c.step_number,
+			s.section_kind,
+			s.label,
+			s.source_path,
+			instr(lower(c.content), ?1) AS match_pos
+		FROM indexed_section_chunks c
+		LEFT JOIN indexed_sections s
+			ON s.workshop_slug = c.workshop_slug
+			AND s.exercise_number IS c.exercise_number
+			AND s.step_number IS c.step_number
+			AND s.section_order = c.section_order
+		WHERE ${whereClauses.join(' AND ')}
+		ORDER BY match_pos ASC, c.char_count DESC, c.id ASC
+		LIMIT ?
+	`
+	const result = await db
+		.prepare(querySql)
+		.bind(...params, limit)
+		.all<KeywordChunkMatchRow>()
+	return result.results ?? []
+}
+
+type KeywordSectionMatchRow = {
+	section_id?: number | null
+	content?: string | null
+	workshop_slug?: string | null
+	exercise_number?: number | null
+	step_number?: number | null
+	section_kind?: string | null
+	label?: string | null
+	source_path?: string | null
+	match_pos?: number | null
+}
+
+async function keywordSearchTopicSections({
+	db,
+	query,
+	limit,
+	workshop,
+	exerciseNumber,
+	stepNumber,
+}: {
+	db: D1Database
+	query: string
+	limit: number
+	workshop?: string
+	exerciseNumber?: number
+	stepNumber?: number
+}) {
+	const loweredQuery = query.toLowerCase()
+	const whereClauses: Array<string> = ['instr(lower(content), ?1) > 0']
+	const params: Array<string | number> = [loweredQuery]
+	if (workshop) {
+		whereClauses.push('workshop_slug = ?')
+		params.push(workshop)
+	}
+	if (typeof exerciseNumber === 'number') {
+		// Sections may be workshop-wide (NULL), but topic search scope is strict.
+		whereClauses.push('exercise_number = ?')
+		params.push(exerciseNumber)
+	}
+	if (typeof stepNumber === 'number') {
+		whereClauses.push('step_number = ?')
+		params.push(stepNumber)
+	}
+	const querySql = `
+		SELECT
+			id AS section_id,
+			workshop_slug,
+			exercise_number,
+			step_number,
+			section_kind,
+			label,
+			source_path,
+			content,
+			instr(lower(content), ?1) AS match_pos
+		FROM indexed_sections
+		WHERE ${whereClauses.join(' AND ')}
+		ORDER BY match_pos ASC, char_count DESC, id ASC
+		LIMIT ?
+	`
+	const result = await db
+		.prepare(querySql)
+		.bind(...params, limit)
+		.all<KeywordSectionMatchRow>()
+	return result.results ?? []
+}
+
+function buildVectorSearchSetupHint() {
+	return [
+		'To enable semantic topic search (Vectorize + Workers AI):',
+		'- Create a Vectorize index (dimensions: 768, metric: cosine).',
+		'- Add Wrangler bindings: `ai` binding "AI" and `vectorize` binding "WORKSHOP_VECTOR_INDEX" pointing at the index name.',
+		'- Re-run workshop indexing to upsert vectors (GitHub Actions "🧠 Load Workshop Content" or POST /internal/workshop-index/reindex).',
+	].join('\n')
+}
+
 export async function searchTopicContext({
 	env,
 	query,
@@ -563,39 +753,19 @@ export async function searchTopicContext({
 	const vectorEnv = env as VectorSearchEnv
 	const vectorIndex = vectorEnv.WORKSHOP_VECTOR_INDEX
 	const ai = vectorEnv.AI
-	if (!vectorIndex || !ai) {
-		throw new Error(
-			'Vector search is unavailable because WORKSHOP_VECTOR_INDEX and AI bindings are not configured.',
-		)
-	}
-
 	const topK = Math.min(
 		Math.max(limit ?? defaultVectorSearchLimit, 1),
 		topicSearchMaxLimit,
 	)
-	const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
 	const filter: Record<string, string | number> = {}
 	if (workshop) filter.workshop_slug = workshop
 	if (typeof exerciseNumber === 'number')
 		filter.exercise_number = exerciseNumber
 	if (typeof stepNumber === 'number') filter.step_number = stepNumber
 
-	const vectorMatches = await vectorIndex.query(embedding, {
-		topK,
-		returnMetadata: 'indexed',
-		filter: Object.keys(filter).length > 0 ? filter : undefined,
-	})
-	const vectorIds = Array.from(
-		new Set(
-			vectorMatches.matches
-				.map((match) => match.id?.trim())
-				.filter((vectorId): vectorId is string => Boolean(vectorId)),
-		),
-	)
-	const chunkRowsByVectorId = await loadTopicChunkRows({
-		db: env.APP_DB,
-		vectorIds,
-	})
+	const warnings: Array<string> = []
+	let mode: 'vector' | 'keyword' = 'vector'
+	let keywordSource: 'chunks' | 'sections' | null = null
 
 	const results: Array<{
 		score: number
@@ -608,35 +778,127 @@ export async function searchTopicContext({
 		chunk: string
 		vectorId: string
 	}> = []
-	const seenVectorIds = new Set<string>()
 
-	for (const match of vectorMatches.matches) {
-		const vectorId = match.id?.trim()
-		if (!vectorId) continue
-		if (seenVectorIds.has(vectorId)) continue
-		seenVectorIds.add(vectorId)
-		const row = chunkRowsByVectorId.get(vectorId)
-		if (!row?.chunk_content || !row.workshop_slug) continue
-		results.push({
-			score: match.score,
-			workshop: row.workshop_slug,
-			exerciseNumber: row.exercise_number ?? undefined,
-			stepNumber: row.step_number ?? undefined,
-			sectionKind: row.section_kind ?? undefined,
-			sectionLabel: row.label ?? undefined,
-			sourcePath: row.source_path ?? undefined,
-			chunk: row.chunk_content,
-			vectorId,
+	if (vectorIndex && ai) {
+		const embedding = await embedSearchQuery({ ai, query: normalizedQuery })
+		const vectorMatches = await vectorIndex.query(embedding, {
+			topK,
+			returnMetadata: 'indexed',
+			filter: Object.keys(filter).length > 0 ? filter : undefined,
 		})
+		const vectorIds = Array.from(
+			new Set(
+				vectorMatches.matches
+					.map((match) => match.id?.trim())
+					.filter((vectorId): vectorId is string => Boolean(vectorId)),
+			),
+		)
+		const chunkRowsByVectorId = await loadTopicChunkRows({
+			db: env.APP_DB,
+			vectorIds,
+		})
+
+		const seenVectorIds = new Set<string>()
+		for (const match of vectorMatches.matches) {
+			const vectorId = match.id?.trim()
+			if (!vectorId) continue
+			if (seenVectorIds.has(vectorId)) continue
+			seenVectorIds.add(vectorId)
+			const row = chunkRowsByVectorId.get(vectorId)
+			if (!row?.chunk_content || !row.workshop_slug) continue
+			results.push({
+				score: match.score,
+				workshop: row.workshop_slug,
+				exerciseNumber: row.exercise_number ?? undefined,
+				stepNumber: row.step_number ?? undefined,
+				sectionKind: row.section_kind ?? undefined,
+				sectionLabel: row.label ?? undefined,
+				sourcePath: row.source_path ?? undefined,
+				chunk: row.chunk_content,
+				vectorId,
+			})
+		}
+	} else {
+		mode = 'keyword'
+		warnings.push(
+			'Vector search bindings are not configured (WORKSHOP_VECTOR_INDEX and/or AI). Falling back to basic keyword search.',
+		)
+		warnings.push(buildVectorSearchSetupHint())
+
+		const keywordChunkRows = await keywordSearchTopicChunks({
+			db: env.APP_DB,
+			query: normalizedQuery,
+			limit: topK,
+			workshop,
+			exerciseNumber,
+			stepNumber,
+		})
+		if (keywordChunkRows.length > 0) {
+			keywordSource = 'chunks'
+			for (const row of keywordChunkRows) {
+				const workshopSlug = row.workshop_slug?.trim()
+				const chunkContent = row.chunk_content ?? ''
+				if (!workshopSlug || chunkContent.trim().length === 0) continue
+				const matchPos = typeof row.match_pos === 'number' ? row.match_pos : 0
+				const vectorId =
+					row.vector_id?.trim() ||
+					`d1-chunk:${Math.max(0, Math.floor(row.chunk_id ?? 0))}`
+				results.push({
+					score: scoreFromMatchPos(matchPos),
+					workshop: workshopSlug,
+					exerciseNumber: row.exercise_number ?? undefined,
+					stepNumber: row.step_number ?? undefined,
+					sectionKind: row.section_kind ?? undefined,
+					sectionLabel: row.label ?? undefined,
+					sourcePath: row.source_path ?? undefined,
+					chunk: chunkContent,
+					vectorId,
+				})
+			}
+		} else {
+			keywordSource = 'sections'
+			const keywordSectionRows = await keywordSearchTopicSections({
+				db: env.APP_DB,
+				query: normalizedQuery,
+				limit: topK,
+				workshop,
+				exerciseNumber,
+				stepNumber,
+			})
+			for (const row of keywordSectionRows) {
+				const workshopSlug = row.workshop_slug?.trim()
+				const content = row.content ?? ''
+				if (!workshopSlug || content.trim().length === 0) continue
+				const matchPos = typeof row.match_pos === 'number' ? row.match_pos : 0
+				const vectorId = `d1-section:${Math.max(
+					0,
+					Math.floor(row.section_id ?? 0),
+				)}`
+				results.push({
+					score: scoreFromMatchPos(matchPos),
+					workshop: workshopSlug,
+					exerciseNumber: row.exercise_number ?? undefined,
+					stepNumber: row.step_number ?? undefined,
+					sectionKind: row.section_kind ?? undefined,
+					sectionLabel: row.label ?? undefined,
+					sourcePath: row.source_path ?? undefined,
+					chunk: buildKeywordExcerpt({ content, query: normalizedQuery }),
+					vectorId,
+				})
+			}
+		}
 	}
 
 	console.info(
 		'mcp-search-topic-context',
 		JSON.stringify({
+			mode,
+			keywordSource,
 			queryLength: normalizedQuery.length,
 			topK,
 			returned: results.length,
 			filter,
+			warningCount: warnings.length,
 			durationMs: Date.now() - startedAt,
 		}),
 	)
@@ -644,6 +906,10 @@ export async function searchTopicContext({
 	return {
 		query: normalizedQuery,
 		limit: topK,
+		mode,
+		vectorSearchAvailable: Boolean(vectorIndex && ai),
+		keywordSource,
+		warnings: warnings.length > 0 ? warnings : undefined,
 		matches: results,
 	}
 }

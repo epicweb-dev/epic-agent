@@ -1361,7 +1361,7 @@ networkTest(
 )
 
 test(
-	'search_topic_context returns clear error when vector bindings are absent',
+	'search_topic_context falls back when vector bindings are absent',
 	async () => {
 		await using database = await createTestDatabase()
 		await using server = await startDevServer(database.persistDir)
@@ -1375,7 +1375,16 @@ test(
 		})
 
 		const textOutput = getTextResultContent(result as CallToolResult)
-		expect(textOutput).toContain('Vector search is unavailable')
+		const payload = JSON.parse(textOutput) as {
+			mode?: string
+			vectorSearchAvailable?: boolean
+			warnings?: Array<string>
+			matches?: Array<unknown>
+		}
+		expect(payload.mode).toBe('keyword')
+		expect(payload.vectorSearchAvailable).toBe(false)
+		expect(Array.isArray(payload.warnings)).toBe(true)
+		expect(Array.isArray(payload.matches)).toBe(true)
 	},
 	{ timeout: defaultTimeoutMs },
 )

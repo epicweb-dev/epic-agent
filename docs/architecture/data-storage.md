@@ -63,8 +63,9 @@ backed, while Vectorize remains an optional cloud binding.
   request payloads within practical limits for larger workshops.
 - If a repository write fails after fresh vector upsert, reindex attempts a
   best-effort rollback delete of the newly inserted vector IDs.
-- If bindings are absent, the tool returns a clear unavailability error instead
-  of failing silently.
+- If bindings are absent, the tool falls back to a keyword search over
+  D1-indexed content and returns `warnings` describing how to enable semantic
+  search.
 
 ## Configuration reference
 

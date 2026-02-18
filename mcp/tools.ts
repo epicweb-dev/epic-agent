@@ -167,7 +167,7 @@ export async function registerTools(agent: MCP) {
 		'search_topic_context',
 		{
 			description:
-				'Search vectorized workshop chunks to find where topics are taught',
+				'Search workshop content to find where topics are taught (semantic when Vectorize + AI are configured)',
 			inputSchema: searchTopicContextInputSchema,
 		},
 		async (rawArgs: unknown) => {
