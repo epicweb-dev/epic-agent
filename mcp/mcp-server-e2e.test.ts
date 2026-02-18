@@ -761,34 +761,10 @@ test(
 		const result = await mcpClient.client.listTools()
 		const toolNames = result.tools.map((tool) => tool.name)
 
-		expect(toolNames).toContain('do_math')
 		expect(toolNames).toContain('list_workshops')
 		expect(toolNames).toContain('retrieve_learning_context')
 		expect(toolNames).toContain('retrieve_diff_context')
 		expect(toolNames).toContain('search_topic_context')
-	},
-	{ timeout: defaultTimeoutMs },
-)
-
-test(
-	'mcp server executes do_math tool',
-	async () => {
-		await using database = await createTestDatabase()
-		await using server = await startDevServer(database.persistDir)
-		await using mcpClient = await createMcpClient(server.origin, database.user)
-
-		const result = await mcpClient.client.callTool({
-			name: 'do_math',
-			arguments: {
-				left: 8,
-				right: 4,
-				operator: '+',
-			},
-		})
-
-		const textOutput = getTextResultContent(result as CallToolResult)
-
-		expect(textOutput).toContain('12')
 	},
 	{ timeout: defaultTimeoutMs },
 )
