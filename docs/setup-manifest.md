@@ -123,7 +123,9 @@ To load workshop content into D1 + Vectorize from CI, run the
   - indexes workshops into D1 using the Cloudflare D1 API
   - unless `WORKSHOP_VECTORIZE_DISABLED` is set, ensures a Vectorize index
     exists (auto-creating it when missing), generates embeddings via the Workers
-    AI API, and upserts vectors into Vectorize
+    AI API (bge-base-en-v1.5; chunks truncated to 512 chars for token limits),
+    and upserts vectors into Vectorize; retries failed batches with smaller
+    splits and skips individual chunks that still fail
   - paginates over workshop repositories using `batchSize` (default 5, max 20)
     until all workshops are processed
 - workflow summary output includes the generated reindex run ids for easier log

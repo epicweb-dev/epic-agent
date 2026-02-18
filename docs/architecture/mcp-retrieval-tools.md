@@ -96,8 +96,8 @@ Indexing is handled outside MCP tool calls.
 Recommended (CI):
 
 - Run the `🧠 Load Workshop Content` GitHub Actions workflow, which executes
-  `bun tools/workshop-content-load-from-clones.ts` and indexes directly into D1 (and Vectorize
-  when configured) using Cloudflare APIs.
+  `bun tools/workshop-content-load-from-clones.ts` and indexes directly into D1
+  (and Vectorize when configured) using Cloudflare APIs.
 
 Optional (deployed Worker endpoint):
 

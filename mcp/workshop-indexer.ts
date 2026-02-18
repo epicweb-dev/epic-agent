@@ -67,7 +67,11 @@ const maxStoredSectionChars = 20_000
 const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
+// bge-base-en-v1.5 max is 512 tokens; 1:1 for safety with dense code
+const maxEmbeddingChars = 512
 const defaultVectorUpsertBatchSize = 200
+// Vectorize id max is 64 bytes.
+const maxVectorIdBytes = 64
 // Vectorize delete_by_ids currently caps payloads at 100 ids.
 const vectorDeleteBatchSize = 100
 const githubRequestMaxAttempts = 3
@@ -368,16 +372,28 @@ async function embedChunksIfConfigured({
 	if (!vectorIndex || !ai) {
 		return sectionChunks
 	}
+	const aiClient = ai
 
-	const vectors: Array<Array<number>> = []
-	for (const chunkBatch of chunkIntoBatches({
-		items: sectionChunks,
-		batchSize: defaultEmbeddingBatchSize,
-	})) {
-		const embeddingResponse = (await ai.run('@cf/baai/bge-base-en-v1.5', {
-			text: chunkBatch.map((chunk) => chunk.content),
+	function prepareText(content: string): string {
+		const raw = (content ?? '')
+			.replaceAll(
+				// eslint-disable-next-line no-control-regex -- strip control chars for embedding API
+				/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,
+				' ',
+			)
+			.trim()
+		if (raw.length === 0) return ' '
+		if (raw.length <= maxEmbeddingChars) return raw
+		return `${raw.slice(0, maxEmbeddingChars)}\n[truncated]`
+	}
+
+	async function embedBatch(
+		texts: Array<string>,
+	): Promise<Array<Array<number>>> {
+		if (texts.length === 0) return []
+		const embeddingResponse = (await aiClient.run('@cf/baai/bge-base-en-v1.5', {
+			text: texts,
 		})) as unknown
-
 		let batchVectors: Array<Array<number>> = []
 		if (
 			embeddingResponse &&
@@ -389,7 +405,57 @@ async function embedChunksIfConfigured({
 		} else if (Array.isArray(embeddingResponse)) {
 			batchVectors = embeddingResponse as Array<Array<number>>
 		}
+		return batchVectors
+	}
 
+	async function embedWithRetry(
+		chunkBatch: Array<
+			IndexedSectionChunkWrite & {
+				exerciseNumber?: number
+				stepNumber?: number
+				sectionOrder: number
+			}
+		>,
+	): Promise<Array<Array<number>>> {
+		const texts = chunkBatch.map((chunk) => prepareText(chunk.content ?? ''))
+		try {
+			return await embedBatch(texts)
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error)
+			if (
+				texts.length > 1 &&
+				(msg.includes('invalid input') || msg.includes('3010'))
+			) {
+				const mid = Math.floor(texts.length / 2)
+				const [left, right] = await Promise.all([
+					embedWithRetry(chunkBatch.slice(0, mid)),
+					embedWithRetry(chunkBatch.slice(mid)),
+				])
+				return [...left, ...right]
+			}
+			if (texts.length === 1) {
+				console.warn(
+					'workshop-reindex-embedding-skip',
+					JSON.stringify({
+						runId,
+						workshopSlug,
+						sectionOrder: chunkBatch[0]?.sectionOrder,
+						chunkIndex: chunkBatch[0]?.chunkIndex,
+						error: msg.slice(0, 200),
+					}),
+				)
+				return [Array.from({ length: 768 }, () => 0)]
+			}
+			throw error
+		}
+	}
+
+	const vectors: Array<Array<number>> = []
+	for (const chunkBatch of chunkIntoBatches({
+		items: sectionChunks,
+		batchSize: defaultEmbeddingBatchSize,
+	})) {
+		const batchVectors = await embedWithRetry(chunkBatch)
 		if (batchVectors.length !== chunkBatch.length) {
 			console.warn(
 				'workshop-reindex-embedding-length-mismatch',
@@ -402,8 +468,21 @@ async function embedChunksIfConfigured({
 			)
 			return sectionChunks
 		}
-
 		vectors.push(...batchVectors)
+	}
+
+	function buildVectorId(
+		rId: string,
+		slug: string,
+		sectionOrder: number,
+		chunkIndex: number,
+	): string {
+		const id = `${rId}:${slug}:${sectionOrder}:${chunkIndex}`
+		if (new TextEncoder().encode(id).byteLength <= maxVectorIdBytes) return id
+		const runPrefix = rId.slice(0, 8)
+		const slugMax = maxVectorIdBytes - runPrefix.length - 2 - 3 - 1 - 3 // separators + sectionOrder + chunkIndex
+		const truncatedSlug = slug.length <= slugMax ? slug : slug.slice(0, slugMax)
+		return `${runPrefix}:${truncatedSlug}:${sectionOrder}:${chunkIndex}`
 	}
 
 	const vectorIdsByIndex: Array<string | undefined> = []
@@ -413,7 +492,12 @@ async function embedChunksIfConfigured({
 			vectorIdsByIndex[index] = undefined
 			return []
 		}
-		const vectorId = `${runId}:${workshopSlug}:${chunk.sectionOrder}:${chunk.chunkIndex}`
+		const vectorId = buildVectorId(
+			runId,
+			workshopSlug,
+			chunk.sectionOrder,
+			chunk.chunkIndex,
+		)
 		vectorIdsByIndex[index] = vectorId
 		return [
 			{
