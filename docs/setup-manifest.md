@@ -89,7 +89,7 @@ To load workshop content into D1 + Vectorize from CI, run the
 
 - choose `production` or `preview` target environment
 - optionally provide a comma/newline-separated workshop list to limit indexing
-  scope (and/or use the workflow checkbox inputs for known slugs)
+  scope
 - leave the workshop list empty to index all discovered workshop repositories
 - workshop slugs are trimmed, lowercased, and deduplicated before indexing
 - workshop filters are capped at 100 unique slugs after normalization
@@ -114,6 +114,22 @@ To load workshop content into D1 + Vectorize from CI, run the
     until all workshops are processed
 - workflow summary output includes the generated reindex run id for easier log
   correlation (`workshop_index_runs.id`)
+
+To keep indexed workshop content fresh automatically, CI also runs the `Nightly
+Workshop Reindex` workflow (`schedule`, production only). It:
+
+- runs daily at `10:00 UTC` (roughly `03:00` Mountain Standard Time)
+- discovers workshop repositories via GitHub Search (same as the manual job)
+- reads `indexed_workshops.source_sha` from D1 to find the last indexed commit
+  for each workshop
+- uses the GitHub compare API to detect whether any file changes since that
+  commit touched `exercises/` or `extra/`
+- reindexes only the affected workshops (and reindexes when compare fails, to
+  avoid silently missing changes)
+
+It requires the same GitHub Actions secrets as the manual indexing workflow (at
+minimum `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, plus a token for
+GitHub API access when workshop repos are private).
 
 When PR preview deploys run, CI deploys a unique Worker per PR named
 `epic-agent-pr-<number>`, updates a pull request comment with the computed
