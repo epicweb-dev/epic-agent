@@ -154,9 +154,8 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 			}),
 		}
 
-		let result: ReturnType<typeof streamText>
 		try {
-			result = streamText({
+			const result = streamText({
 				// workers-ai-provider currently types only a subset of Workers AI models.
 				// Prefer a typed model name to keep `bun run typecheck` green.
 				model: workersai('@cf/meta/llama-3.1-8b-instruct-awq'),
@@ -168,6 +167,8 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 				tools,
 				stopWhen: stepCountIs(6),
 			})
+
+			return result.toUIMessageStreamResponse()
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			return new Response(
@@ -183,7 +184,5 @@ export class ChatAgent extends AIChatAgent<ChatAgentEnv> {
 				},
 			)
 		}
-
-		return result.toUIMessageStreamResponse()
 	}
 }
