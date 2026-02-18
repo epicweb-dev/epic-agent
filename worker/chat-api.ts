@@ -231,6 +231,8 @@ export async function handleChatTurnRequest({
 	}
 
 	const appEnv = getEnv(env)
+	// `setAuthSessionSecret` is idempotent and caches per-isolate, so calling it
+	// per request is safe and avoids having to thread the secret elsewhere.
 	setAuthSessionSecret(appEnv.COOKIE_SECRET)
 	const session = await readAuthSession(request)
 	if (!session) {
@@ -319,8 +321,8 @@ export async function handleChatTurnRequest({
 			}
 		}
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error)
-		console.error('chat-turn-mcp-failed', message, error)
+		const errorMessage = error instanceof Error ? error.message : String(error)
+		console.error('chat-turn-mcp-failed', errorMessage, error)
 		return jsonResponse(
 			{
 				ok: false,
