@@ -765,6 +765,30 @@ test(
 		expect(toolNames).toContain('retrieve_learning_context')
 		expect(toolNames).toContain('retrieve_diff_context')
 		expect(toolNames).toContain('search_topic_context')
+		expect(toolNames).toContain('retrieve_quiz_instructions')
+	},
+	{ timeout: defaultTimeoutMs },
+)
+
+test(
+	'mcp server returns quiz facilitation instructions',
+	async () => {
+		await using database = await createTestDatabase()
+		await using server = await startDevServer(database.persistDir)
+		await using mcpClient = await createMcpClient(server.origin, database.user)
+
+		const result = await mcpClient.client.callTool({
+			name: 'retrieve_quiz_instructions',
+			arguments: {
+				topic: 'JavaScript closures',
+				questionCount: 5,
+			},
+		})
+
+		const textOutput = getTextResultContent(result as CallToolResult)
+		expect(textOutput).toContain('Quiz facilitation protocol')
+		expect(textOutput).toContain('Topic: JavaScript closures')
+		expect(textOutput).toContain('Ask exactly one question at a time')
 	},
 	{ timeout: defaultTimeoutMs },
 )

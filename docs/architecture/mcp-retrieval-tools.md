@@ -9,6 +9,8 @@ The MCP server currently exposes these retrieval-oriented tools:
 
 - `list_workshops`
 - `retrieve_learning_context`
+- `retrieve_quiz_instructions` (quiz facilitation protocol / retention
+  checklist)
 - `retrieve_diff_context`
 - `search_topic_context` (requires optional Vectorize + AI bindings)
 
@@ -100,6 +102,20 @@ Enabling semantic search:
   config, and add an `ai` binding named `AI`.
 - Re-run workshop indexing to populate vectors (GitHub Actions workflow "Load
   Workshop Content").
+
+## `retrieve_quiz_instructions`
+
+Returns evidence-based, step-by-step instructions for how an agent should run a
+quiz to validate and reinforce a learner's understanding.
+
+Key behavior:
+
+- This tool returns a quiz protocol (not workshop content).
+- It explicitly recommends asking exactly one question at a time, waiting for an
+  attempt, giving immediate feedback, and revisiting missed concepts later
+  (spaced retrieval).
+- Pair it with retrieval tools like `retrieve_learning_context` or
+  `search_topic_context` when you need source material to generate questions.
 
 ## Indexing trigger
 
