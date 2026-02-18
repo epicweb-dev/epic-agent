@@ -89,7 +89,7 @@ To load workshop content into D1 + Vectorize from CI, run the
 
 - choose `production` or `preview` target environment
 - optionally provide a comma/newline-separated workshop list to limit indexing
-  scope
+  scope (and/or use the workflow checkbox inputs for known slugs)
 - leave the workshop list empty to index all discovered workshop repositories
 - workshop slugs are trimmed, lowercased, and deduplicated before indexing
 - workshop filters are capped at 100 unique slugs after normalization
@@ -110,9 +110,9 @@ To load workshop content into D1 + Vectorize from CI, run the
     AI API (bge-base-en-v1.5; chunks truncated to 512 chars for token limits),
     and upserts vectors into Vectorize; retries failed batches with smaller
     splits and skips individual chunks that still fail
-  - paginates over workshop repositories using `batchSize` (default 5, max 20)
+  - paginates over workshop repositories using `batchSize` (default 2, max 20)
     until all workshops are processed
-- workflow summary output includes the generated reindex run ids for easier log
+- workflow summary output includes the generated reindex run id for easier log
   correlation (`workshop_index_runs.id`)
 
 When PR preview deploys run, CI deploys a unique Worker per PR named

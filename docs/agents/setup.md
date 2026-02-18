@@ -20,8 +20,9 @@ Quick notes for getting a local epic-agent environment running.
 - `bun run dev` (starts mock API servers automatically and sets
   `RESEND_API_BASE_URL` to the local mock host).
 - Workshop indexing runs via the GitHub Actions workflow "Load Workshop Content"
-  (it writes to D1 and Vectorize from CI). The app runtime does not expose a
-  reindex endpoint.
+  (it writes to D1 and Vectorize from CI; defaults to batch size 2 and supports
+  checkbox selection of known slugs or a comma/newline list). The app runtime
+  does not expose a reindex endpoint.
 - Add new mock API servers by following `docs/agents/mock-api-servers.md`.
 - If you only need the client bundle or worker, use:
   - `bun run dev:client`

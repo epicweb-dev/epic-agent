@@ -106,9 +106,9 @@ After deploy, run the `🧠 Load Workshop Content` workflow from the Actions tab
 to populate D1 (and Vectorize when enabled) directly from the workflow job.
 
 - choose the target environment (`production` or `preview`)
-- choose a batch size (workshops processed per request, default 5)
-- optionally provide comma/newline-separated workshop slugs to scope the index
-  run
+- choose a batch size (workshops processed per request, default 2)
+- optionally select workshop checkboxes (known slugs) and/or provide
+  comma/newline-separated workshop slugs to scope the index run
 - provided workshop slugs are trimmed, lowercased, and deduplicated before
   indexing starts
 - leave workshop input empty to index all workshop repositories

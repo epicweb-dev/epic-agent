@@ -1,9 +1,13 @@
 import { readFileSync, appendFileSync } from 'node:fs'
 import { z } from 'zod'
 import { stripJsonc } from './strip-jsonc.ts'
-import { runWorkshopReindex } from '../mcp/workshop-indexer.ts'
+import {
+	listWorkshopRepositories,
+	runWorkshopReindex,
+} from '../mcp/workshop-indexer.ts'
 import {
 	workshopFilterMaxCount,
+	workshopIndexBatchDefaultSize,
 	workshopIndexBatchMaxSize,
 } from '../shared/workshop-index-constants.ts'
 
@@ -808,7 +812,8 @@ async function main() {
 		TARGET_ENVIRONMENT: environmentRaw,
 	})
 
-	const batchSizeRaw = process.env.WORKSHOP_BATCH_SIZE ?? '5'
+	const batchSizeRaw =
+		process.env.WORKSHOP_BATCH_SIZE ?? String(workshopIndexBatchDefaultSize)
 	const batchSize = parseIntegerInput(batchSizeRaw, 'batchSize')
 	if (batchSize === null) {
 		throw new Error('batchSize is required.')
@@ -853,6 +858,11 @@ async function main() {
 	let totalSectionCount = 0
 	let totalSectionChunkCount = 0
 
+	const repositories = await listWorkshopRepositories({
+		env: env as Parameters<typeof listWorkshopRepositories>[0]['env'],
+		onlyWorkshops,
+	})
+
 	let cursor: string | undefined
 	let iteration = 0
 	while (true) {
@@ -868,6 +878,7 @@ async function main() {
 				AI?: Ai
 			},
 			onlyWorkshops,
+			repositories,
 			cursor,
 			batchSize,
 		})
