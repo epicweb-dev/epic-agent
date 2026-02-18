@@ -25,14 +25,35 @@ export function withCors<Props>({
 		// Call the original handler
 		const response = await handler(request, env, ctx)
 
-		// Add CORS headers to ALL responses, including early returns
-		const newHeaders = mergeHeaders(response.headers, corsHeaders)
+		// WebSocket upgrade responses cannot be re-wrapped without dropping the
+		// `webSocket` field, so attempt in-place header mutation and return as-is.
+		if (response.status === 101) {
+			try {
+				for (const [key, value] of new Headers(corsHeaders).entries()) {
+					response.headers.set(key, value)
+				}
+			} catch {
+				// Some Responses (e.g. from fetch()) have immutable headers.
+			}
+			return response
+		}
 
-		return new Response(response.body, {
-			status: response.status,
-			statusText: response.statusText,
-			headers: newHeaders,
-		})
+		// Prefer mutating the existing response to preserve properties (e.g. body
+		// streams), but fall back to constructing a new Response if headers are
+		// immutable.
+		try {
+			for (const [key, value] of new Headers(corsHeaders).entries()) {
+				response.headers.set(key, value)
+			}
+			return response
+		} catch {
+			const newHeaders = mergeHeaders(response.headers, corsHeaders)
+			return new Response(response.body, {
+				status: response.status,
+				statusText: response.statusText,
+				headers: newHeaders,
+			})
+		}
 	}
 }
 
