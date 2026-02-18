@@ -176,11 +176,9 @@ export async function retrieveWorkshopList({
 			? limit
 			: listWorkshopsMaxLimit
 	const pageLimit = Math.min(Math.max(requestedLimit, 1), listWorkshopsMaxLimit)
-	const shouldFetchAll =
-		all === true ||
-		(all !== false &&
-			typeof limit === 'undefined' &&
-			typeof cursor === 'undefined')
+	// Default to fetching all pages to avoid "it only returned the first 20/100"
+	// surprises. Callers can opt into a single page response with `all: false`.
+	const shouldFetchAll = all !== false
 
 	if (!shouldFetchAll) {
 		const result = await listIndexedWorkshops({

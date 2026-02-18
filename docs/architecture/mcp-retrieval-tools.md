@@ -27,8 +27,8 @@ Supported filters:
 - `product`
 - `hasDiffs`
 - `limit` is clamped to a maximum of `100` per page
-- `all` (boolean) fetches all pages (defaults to enabled when `limit` + `cursor`
-  are omitted)
+- `all` (boolean) fetches all pages (defaults to `true`; set `all: false` to
+  paginate manually with `limit` + `cursor`)
 
 ## `retrieve_learning_context`
 

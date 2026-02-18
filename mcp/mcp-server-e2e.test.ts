@@ -937,6 +937,7 @@ test(
 		const firstPageResult = await mcpClient.client.callTool({
 			name: 'list_workshops',
 			arguments: {
+				all: false,
 				limit: 1,
 			},
 		})
@@ -953,6 +954,7 @@ test(
 		const secondPageResult = await mcpClient.client.callTool({
 			name: 'list_workshops',
 			arguments: {
+				all: false,
 				limit: 1,
 				cursor: parsedFirstPage.nextCursor,
 			},
