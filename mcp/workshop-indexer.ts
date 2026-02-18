@@ -74,9 +74,9 @@ const defaultChunkSize = 1_600
 const defaultChunkOverlap = 180
 const defaultEmbeddingBatchSize = 64
 const defaultVectorUpsertBatchSize = 200
-const workersAiEmbeddingMaxAttempts = 5
-const workersAiEmbeddingRetryBaseDelayMs = 400
-const workersAiEmbeddingRetryMaxDelayMs = 12_000
+const workersAiEmbeddingMaxAttempts = 8
+const workersAiEmbeddingRetryBaseDelayMs = 1_000
+const workersAiEmbeddingRetryMaxDelayMs = 30_000
 // Vectorize id max is 64 bytes.
 const maxVectorIdBytes = 64
 // Vectorize delete_by_ids currently caps payloads at 100 ids.
@@ -432,6 +432,17 @@ async function embedChunksIfConfigured({
 					await retryConfig.waitFn(retryDelayMs)
 					continue
 				}
+				if (isWorkersAiCapacityError(error)) {
+					throw new Error(
+						[
+							`Workers AI capacity temporarily exceeded while embedding workshop "${workshopSlug}".`,
+							`Retried ${attempt}/${retryConfig.maxAttempts} times and still received capacity errors.`,
+							'Failing the index run so it can be retried later.',
+							`Last error: ${getErrorMessage(error).slice(0, 200)}`,
+						].join(' '),
+						{ cause: error },
+					)
+				}
 				throw error
 			}
 		}
@@ -499,39 +510,24 @@ async function embedChunksIfConfigured({
 	}
 
 	const vectors: Array<Array<number>> = []
-	try {
-		for (const chunkBatch of chunkIntoBatches({
-			items: sectionChunks,
-			batchSize: defaultEmbeddingBatchSize,
-		})) {
-			const batchVectors = await embedWithRetry(chunkBatch)
-			if (batchVectors.length !== chunkBatch.length) {
-				console.warn(
-					'workshop-reindex-embedding-length-mismatch',
-					JSON.stringify({
-						runId,
-						workshopSlug,
-						expected: chunkBatch.length,
-						received: batchVectors.length,
-					}),
-				)
-				return sectionChunks
-			}
-			vectors.push(...batchVectors)
-		}
-	} catch (error) {
-		if (isWorkersAiCapacityError(error)) {
+	for (const chunkBatch of chunkIntoBatches({
+		items: sectionChunks,
+		batchSize: defaultEmbeddingBatchSize,
+	})) {
+		const batchVectors = await embedWithRetry(chunkBatch)
+		if (batchVectors.length !== chunkBatch.length) {
 			console.warn(
-				'workshop-reindex-embedding-capacity-exceeded',
+				'workshop-reindex-embedding-length-mismatch',
 				JSON.stringify({
 					runId,
 					workshopSlug,
-					error: getErrorMessage(error).slice(0, 200),
+					expected: chunkBatch.length,
+					received: batchVectors.length,
 				}),
 			)
 			return sectionChunks
 		}
-		throw error
+		vectors.push(...batchVectors)
 	}
 
 	function buildVectorId(

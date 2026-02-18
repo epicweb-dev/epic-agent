@@ -340,7 +340,7 @@ test('chunkIntoBatches clamps invalid batch sizes', () => {
 	expect(batches).toEqual([[1], [2], [3]])
 })
 
-test('embedChunksIfConfigured skips vector embeddings on Workers AI capacity errors', async () => {
+test('embedChunksIfConfigured fails after retrying Workers AI capacity errors', async () => {
 	let embeddingCalls = 0
 	let upsertCalls = 0
 	const env = {
@@ -364,21 +364,28 @@ test('embedChunksIfConfigured skips vector embeddings on Workers AI capacity err
 		{ sectionOrder: 10, chunkIndex: 1, content: 'goodbye world' },
 	]
 
-	const embedded = await workshopIndexerTestUtils.embedChunksIfConfigured({
-		env,
-		runId: 'run-test',
-		workshopSlug: 'example-workshop',
-		sectionChunks,
-		embeddingRetry: {
-			maxAttempts: 3,
-			baseDelayMs: 0,
-			maxDelayMs: 0,
-			wait: async () => {},
-		},
-	})
+	let thrown: unknown = null
+	try {
+		await workshopIndexerTestUtils.embedChunksIfConfigured({
+			env,
+			runId: 'run-test',
+			workshopSlug: 'example-workshop',
+			sectionChunks,
+			embeddingRetry: {
+				maxAttempts: 3,
+				baseDelayMs: 0,
+				maxDelayMs: 0,
+				wait: async () => {},
+			},
+		})
+	} catch (error) {
+		thrown = error
+	}
 
-	expect(embedded).toEqual(sectionChunks)
-	expect(embedded[0]?.vectorId).toBeUndefined()
+	expect(thrown).toBeInstanceOf(Error)
+	expect((thrown as Error).message.toLowerCase()).toContain(
+		'capacity temporarily exceeded',
+	)
 	expect(embeddingCalls).toBe(3)
 	expect(upsertCalls).toBe(0)
 })
