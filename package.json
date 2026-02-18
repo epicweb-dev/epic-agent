@@ -47,14 +47,17 @@
   },
   "prettier": "@epic-web/config/prettier",
   "dependencies": {
+    "@cloudflare/ai-chat": "^0.1.2",
     "@cloudflare/workers-oauth-provider": "^0.2.3",
     "@epic-web/invariant": "^1.0.0",
     "@mcp-ui/server": "6.1.0",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "1.26.0",
-    "agents": "^0.4.1",
+    "agents": "0.5.0",
+    "ai": "^6.0.91",
     "get-port": "^7.1.0",
     "remix": "^3.0.0-alpha.2",
+    "workers-ai-provider": "^3.1.1",
     "zod": "^4.3.6"
   }
 }
