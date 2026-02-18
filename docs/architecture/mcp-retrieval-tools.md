@@ -20,14 +20,15 @@ Typical use:
 
 - discover available workshop slugs
 - identify whether diff context is available (`hasDiffs`)
-- paginate with `limit` + `cursor`
+- optionally paginate with `limit` + `cursor`
 
 Supported filters:
 
 - `product`
 - `hasDiffs`
-- `limit` is clamped to a maximum of `100` per request
-- when `limit` is omitted, the tool defaults to returning up to `100` workshops
+- `limit` is clamped to a maximum of `100` per page
+- `all` (boolean) fetches all pages (defaults to enabled when `limit` + `cursor`
+  are omitted)
 
 ## `retrieve_learning_context`
 
