@@ -2,7 +2,7 @@
   <img src="./public/logo.png" alt="epic-agent logo" width="400" />
 
   <p>
-    <strong>A starter and reference for building full-stack web applications on Cloudflare Workers</strong>
+    <strong>Connect the built-in MCP server to your agent to get context on Epic Web workshop material and steer coding agents</strong>
   </p>
 
   <p>
@@ -16,18 +16,16 @@
 
 ---
 
-epic-agent ships a Remix-powered UI, server routing, and OAuth-protected MCP
-endpoints so you can build both a user-facing app and tooling APIs on the same
-Worker.
+epic-agent provides an MCP server and a Remix-powered UI on Cloudflare Workers.
+It allows you to connect the MCP server to your agent (like ChatGPT or coding
+agents) to get context on workshop material and review things. This is useful
+for evaluating technical decisions, solidifying your understanding, and steering
+coding agents to follow the practices taught in the workshops.
+
+A feature that's coming soon is a built-in chat page that will allow you to chat
+directly with an LLM that has access to the built-in MCP server.
 
 ## Quick Start
-
-```bash
-bunx create-epic-agent
-```
-
-This will clone the template, install dependencies, run the guided setup, and
-start the dev server.
 
 See [`docs/getting-started.md`](./docs/getting-started.md) for the full setup
 paths and expectations.

@@ -76,13 +76,28 @@ export function HomeRoute() {
 								color: colors.text,
 							}}
 						>
-							epic-agent{' '}
-							<span css={{ color: colors.primaryText }}>Remix 3</span>
+							epic-agent
 						</h1>
-						<p css={{ margin: 0, color: colors.textMuted }}>
-							Remix 3 components running on the client, backed by Remix 3
-							routing in the worker.
-						</p>
+						<div
+							css={{
+								color: colors.textMuted,
+								lineHeight: 1.5,
+								textAlign: 'left',
+							}}
+						>
+							<p css={{ margin: 0, marginBottom: spacing.sm }}>
+								Connect the built-in MCP server to your agent to get context on
+								workshop material and review things. Steer coding agents to
+								follow workshop practices or evaluate technical decisions with
+								ChatGPT.
+							</p>
+							<p css={{ margin: 0 }}>
+								<em>
+									Coming soon: A built-in chat page to talk directly with an LLM
+									that has access to the MCP server.
+								</em>
+							</p>
+						</div>
 					</div>
 				</div>
 			</div>
