@@ -7,6 +7,7 @@ import {
 	OAuthCallbackRoute,
 	ResetPasswordRoute,
 } from './client-routes.tsx'
+import { ChatRoute } from './chat-route.tsx'
 import { Router } from './client-router.tsx'
 import {
 	fetchSessionInfo,
@@ -75,6 +76,9 @@ export function App(handle: Handle) {
 					<a href="/" css={navLinkCss}>
 						Home
 					</a>
+					<a href="/chat" css={navLinkCss}>
+						Chat
+					</a>
 					{showAuthLinks ? (
 						<>
 							<a href="/login" css={navLinkCss}>
@@ -102,6 +106,7 @@ export function App(handle: Handle) {
 					setup={{
 						routes: {
 							'/': HomeRoute(),
+							'/chat': ChatRoute(),
 							'/account': AccountRoute(),
 							'/login': LoginRoute('login'),
 							'/signup': LoginRoute('signup'),
