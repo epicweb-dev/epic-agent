@@ -6,6 +6,7 @@ const routes = route({
 	login: '/login',
 	signup: '/signup',
 	account: '/account',
+	chat: '/chat',
 	auth: post('/auth'),
 	session: '/session',
 	logout: post('/logout'),

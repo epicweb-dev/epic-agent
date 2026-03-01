@@ -1,6 +1,7 @@
 import { createRouter } from 'remix/fetch-router'
 import { type AppEnv } from '../types/env-schema.ts'
 import account from './handlers/account.ts'
+import chat from './handlers/chat.ts'
 import { createAuthHandler } from './handlers/auth.ts'
 import health from './handlers/health.ts'
 import home from './handlers/home.ts'
@@ -29,6 +30,7 @@ export function createAppRouter(appEnv: AppEnv) {
 	router.map(routes.login, login)
 	router.map(routes.signup, signup)
 	router.map(routes.account, account)
+	router.map(routes.chat, chat)
 	router.map(routes.auth, createAuthHandler(appEnv))
 	router.map(routes.session, session)
 	router.map(routes.logout, logout)
